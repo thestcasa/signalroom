@@ -19,3 +19,4 @@ The MVP is a local Python application. It has no database, queue, authentication
 
 Provider-specific parsing stops at the adapter. Metrics, gates, evidence construction, reporting, and presentation consume internal models.
 
+The opponent-preparation layer (`opponent.py`) consumes typed evidence sequences rather than provider records. It owns routine-family grouping, window denominators, uncertainty, quality gates, and stability labels. The Streamlit app only selects state and renders the resulting structured comparisons. The HTML briefing uses the same structured values and evidence IDs, so it cannot silently diverge from the interface.

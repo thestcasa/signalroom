@@ -29,3 +29,7 @@ An attacking corner begins with a team pass whose subtype is `Corner`. The seque
 A short corner has a first-delivery length of at most 15 StatsBomb pitch units. Longer deliveries are direct. If length is unavailable, delivery type and target zone are `unknown`; no coordinate proxy is used. `shot_rate` is sequence conversion: the share of corners followed by at least one team shot inside the sequence window. `shots` remains the total shot count, so rebounds do not inflate conversion.
 
 If pooled match variance is zero while window means differ, Hedges g is undefined. SignalRoom serializes the effect as `null` and suppresses the comparison rather than emitting a non-standard JSON infinity or treating it as decisive evidence.
+
+## Opponent-preparation comparison
+
+The current source bundle supports a selected-team recent window versus the selected team's previous chronological window. Routine shares use all attacking corners in each window as denominators. The comparison reports percentage-point difference, relative difference only when the baseline share is non-zero, and a deterministic binomial bootstrap interval. Routine-level publication requires a minimum recent sample and at least 90% completeness for the corner delivery-length field. Shot xG is independently suppressed when any supporting shot lacks xG. Stability is recomputed for nearby recent-window sizes and is labelled for analysts rather than presented as a binary truth claim.

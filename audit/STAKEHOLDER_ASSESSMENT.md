@@ -5,3 +5,5 @@ SignalRoom is a polished and unusually honest portfolio demonstration. It shows 
 The project should be demonstrated through SetPieceLab and the evidence room. The strongest message is: the system produces reviewable evidence and is allowed to abstain. It should not be sold as a tactical discovery engine, a predictive model, or a replacement for a club’s existing analysis stack.
 
 The next credible proof is not more dashboard breadth. It is one evaluated opponent-preparation workflow, using comparative set-piece evidence and feedback from real analysts.
+
+The current extension implements that workflow for the strongest valid baseline in the available bundles: recent team window versus previous team window. It is ready for analyst validation, but no external analyst feedback has been collected. The recommended demonstration is now: choose the case, read the routine comparison, open one sequence, and download the short briefing.

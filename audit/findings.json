@@ -195,6 +195,22 @@
       "verification": "Diagnostics regression passes; per-metric publication gating remains roadmap work."
     },
     {
+      "id": "SR-A-003-EXT",
+      "category": "analytical-validity",
+      "severity": "medium",
+      "verified": true,
+      "component": "Opponent-preparation routine comparison",
+      "evidence": "Both real-data bundles now expose recent and previous-window routine shares, bootstrap intervals, quality percentages, stability labels, and representative evidence IDs.",
+      "reproduction": "Rebuild both case bundles, recompute routine shares independently from SP evidence sequences, and compare exported briefing values.",
+      "actual_behavior": "A configurable within-team baseline is available and uses all window corners as the denominator.",
+      "expected_behavior": "Published routine observations must be comparative, uncertain, stable enough to review, and evidence-linked.",
+      "root_cause": "The MVP only presented absolute routine inventories.",
+      "impact": "Analysts previously lacked an opponent-preparation comparison context.",
+      "resolution": "Added the opponent comparison layer, quality gates, stability labels, filtered evidence room, and deterministic briefing export.",
+      "repaired": true,
+      "verification": "27 tests pass, both real bundles rebuild, strict JSON parsing passes, and independent routine share recomputation matches the comparison layer."
+    },
+    {
       "id": "SR-P-001",
       "category": "product-scope",
       "severity": "observation",

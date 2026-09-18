@@ -72,6 +72,7 @@ def analyze_attacking_corners(
                     label=routine,
                     start_minute=corner.minute,
                     events=tuple(_summary(event) for event in following),
+                    quality=_sequence_quality(corner, following),
                 )
             )
             records.append(
@@ -180,4 +181,19 @@ def _summary(event: Event) -> dict[str, object]:
         "location": [event.x, event.y],
         "end_location": [event.end_x, event.end_y],
         "xg": event.xg,
+    }
+
+
+def _sequence_quality(corner: Event, events: list[Event]) -> dict[str, object]:
+    moves = [event for event in events if event.event_type in {"Pass", "Carry"}]
+    shots = [event for event in events if event.event_type == "Shot"]
+    return {
+        "corner_length_available": (corner.raw.get("pass") or {}).get("length") is not None,
+        "locations_complete": all(event.x is not None and event.y is not None for event in events),
+        "movement_endpoints_complete": all(
+            event.end_x is not None and event.end_y is not None for event in moves
+        ),
+        "shot_xg_complete": all(event.xg is not None for event in shots),
+        "sequence_complete": True,
+        "event_count": len(events),
     }

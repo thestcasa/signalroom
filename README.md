@@ -4,7 +4,7 @@ SignalRoom converts football event data into short, evidence-linked historical b
 
 **Live demo:** https://signalroom-tka1.onrender.com
 
-The MVP deliberately takes a narrow path: cautious match-window change detection plus a deeper `SetPieceLab` module for attacking corners. It suppresses weak findings instead of filling a report.
+The product follows a focused opponent-preparation workflow: choose a historical opponent case, compare the latest team window with the previous team window, and open the event sequences behind any routine difference. It suppresses weak findings instead of filling a report.
 
 ## What works
 
@@ -17,6 +17,7 @@ The MVP deliberately takes a narrow path: cautious match-window change detection
 - Event-level evidence references for every published finding
 - Grounded, template-based reports that need no LLM
 - Interactive Streamlit analyst interface and static HTML exports
+- Configurable routine comparison with bootstrap intervals, sensitivity labels, data-quality gates, and deterministic briefing download
 - Two configurations: Brighton Women in the 2023/24 WSL and Bayer Leverkusen in the 2023/24 Bundesliga
 
 ## Quick start
@@ -51,6 +52,7 @@ To analyze another available team, copy a TOML file in `configs/`, change the te
 - `src/signalroom/metrics.py`: metric definitions and calculations
 - `src/signalroom/statistics.py`: change detection and suppression
 - `src/signalroom/setpieces.py`: corner sequence and routine analysis
+- `src/signalroom/opponent.py`: comparison baseline, uncertainty, completeness, and stability logic
 - `src/signalroom/evidence.py`: event trace construction
 - `src/signalroom/reporting.py`: deterministic narrative and grounding checks
 - `app.py`: analyst interface
@@ -63,6 +65,14 @@ To analyze another available team, copy a TOML file in `configs/`, change the te
 SignalRoom supports teams and competitions available through its implemented event-data adapters. The initial version uses StatsBomb Open Data and is designed so additional providers can be added later.
 
 This repository is not affiliated with or endorsed by Brighton & Hove Albion, Bayer Leverkusen, StatsBomb, Hudl, or any other club or data provider. The case studies are historical and are not current tactical advice.
+
+## Opponent-preparation workflow
+
+The default comparison is the selected team's latest chronological match window against its previous chronological window. This is a valid within-team baseline using the source data already bundled in each case. The current bundles do not include every competition match, so SignalRoom does not fabricate a competition-wide routine baseline. A future source expansion can add that baseline after verifying coverage for all teams and matches.
+
+The interface publishes a routine only when the recent sample, routine-share completeness, and comparison evidence gates pass. Bootstrap intervals show uncertainty around share differences. Nearby-window sensitivity produces stakeholder labels such as `stable`, `directionally consistent`, `sensitive to window selection`, or `sample too small`.
+
+The Evidence room filters by routine, opponent, and shot outcome, shows the ordered event sequence and pitch view, and exports source event identifiers. The briefing download is deterministic HTML, not an automated tactical essay.
 
 ## Data terms and attribution
 

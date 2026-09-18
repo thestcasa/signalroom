@@ -79,3 +79,39 @@ def _css() -> str:
 
 def dump_bundle(bundle: dict[str, object], output: Path) -> None:
     output.write_text(json.dumps(bundle, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def preparation_brief_html(
+    bundle: dict[str, object],
+    comparisons: list[dict[str, object]],
+    baseline_label: str,
+    recent_matches: int,
+    baseline_matches: int,
+) -> str:
+    """Return a short deterministic, self-contained briefing for the current UI state."""
+    selected = [row for row in comparisons if row.get("publish")][:5]
+    if not selected:
+        selected_html = "<p><strong>No broad routine difference passed every evidence gate.</strong> Review the suppressed diagnostics.</p>"
+    else:
+        selected_html = "".join(
+            f"<article><h3>{escape(str(row['routine']))}</h3>"
+            f"<p>{float(row['recent_share'])*100:.1f}% recent versus {float(row['baseline_share'])*100:.1f}% baseline. "
+            f"Difference {float(row['absolute_share_difference'])*100:+.1f} percentage points. "
+            f"n={row['sample_size']}, baseline n={row['baseline_sample_size']}; {escape(str(row['stability']))}.</p>"
+            f"<p>Evidence: {escape(', '.join(str(value) for value in row['evidence_ids']))}</p></article>"
+            for row in selected
+        )
+    quality = bundle.get("set_piece_lab", {}).get("quality", {})
+    warnings = list(bundle["data"].get("limitations", []))
+    for key, label in (("corner_length_complete", "corner delivery length"), ("locations_complete", "event locations"), ("movement_endpoints_complete", "movement endpoints"), ("shot_xg_complete", "shot xG")):
+        if key in quality and float(quality[key]) < 0.90:
+            warnings.insert(0, f"{label.title()} completeness is {float(quality[key])*100:.1f}%, below the 90% publication threshold.")
+    warning_html = "".join(f"<li>{escape(str(item))}</li>" for item in warnings)
+    return f"""<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
+<title>SignalRoom briefing | {escape(str(bundle['case']['team']))}</title>
+<style>body{{font-family:Inter,system-ui,sans-serif;color:#102a43;background:#f7f5ef;max-width:900px;margin:0 auto;padding:40px 24px;line-height:1.45}}h1{{font-size:48px;line-height:1;margin:12px 0}}h2{{margin-top:42px}}.eyebrow{{color:#9e3e35;text-transform:uppercase;letter-spacing:.14em;font-size:11px;font-weight:800}}article{{background:white;border:1px solid #d7e1e6;border-radius:12px;padding:18px;margin:12px 0}}.meta{{color:#587287}}footer{{border-top:1px solid #d7e1e6;margin-top:42px;padding-top:18px;font-size:12px;color:#587287}}</style></head>
+<body><div class='eyebrow'>SignalRoom · evidence-first opponent preparation</div><h1>{escape(str(bundle['case']['team']))}</h1>
+<p class='meta'>{escape(str(bundle['case']['competition']))} · {escape(str(bundle['case']['season']))} · {escape(baseline_label)} · recent {recent_matches} matches versus previous {baseline_matches}</p>
+<h2>Routine observations</h2>{selected_html}<h2>Definitions</h2><p>Shares describe recorded attacking-corner routines. They do not establish intent, effectiveness, or causality.</p>
+<h2>Data quality and limitations</h2><ul>{warning_html}</ul><p>Source revision: {escape(str(bundle['data']['source_revision']))}. Historical open data, not current tactical advice.</p>
+<footer>No affiliation with or endorsement by any club or provider is claimed. Every observation above links to source event sequences in the evidence room.</footer></body></html>"""

@@ -25,8 +25,16 @@
 - Improved contrast, heading semantics, responsive title behavior, and image alternative text.
 - Updated SetPieceLab tables to distinguish conversion from total shots.
 - Regenerated JSON, CSV, PNG, HTML, Markdown, claims, and the stakeholder PDF.
+- Added opponent-preparation controls, routine-share comparisons, uncertainty, stability labels, filtered evidence review, event-ID export, and deterministic briefing HTML.
+- Added sequence-level completeness fields for corner length, locations, movement endpoints, shot xG, and sequence retention.
 
 ## Dependency health
 
 - Upgraded optional `pypdf` and `pytest` dependencies to advisory-free versions.
 - Verified the resolved environment with `pip-audit`.
+
+## Opponent-preparation extension
+
+- Implemented the strongest valid current baseline: recent selected-team window versus previous selected-team window.
+- Added regression coverage for denominator correctness, suppression reasons, stability labels, and briefing determinism.
+- Prepared `docs/ANALYST_VALIDATION_PACKAGE.md`; no external analyst validation is claimed yet.

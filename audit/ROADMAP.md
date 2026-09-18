@@ -1,6 +1,6 @@
 # Prioritized roadmap
 
-## 1. Opponent-preparation comparison, build next
+## 1. Opponent-preparation comparison, delivered
 
 - User problem: analysts need to know which set-piece behaviors are unusually frequent or recently changing, with video/event evidence they can inspect.
 - Target user: first-team or academy opposition analyst.
@@ -11,22 +11,22 @@
 - Risks: schedule effects, small samples, routine taxonomy sensitivity, and false causal interpretation.
 - Effort: medium, approximately one focused iteration after metric design review.
 - Validation: task-based review with two or three analysts, blinded correctness checks, and known-fixture regression tests.
-- Priority: P0.
+- Priority: P0. Delivered in the current extension with a within-team baseline, evidence filters, stability checks, and briefing export.
 
-## 2. Metric-level data-quality gates, build alongside milestone 1
+## 2. Metric-level data-quality gates, partially delivered
 
 - Problem: missing endpoints or xG can silently lower derived metrics even when dataset validation reports them.
 - Value: prevents incomplete provider records from becoming publishable comparisons.
 - Implementation: completeness counters per metric and match, configurable tolerance, explicit suppression reasons, and UI diagnostics.
 - Effort: small to medium.
-- Priority: P0 correctness work.
+- Priority: P0 correctness work. Set-piece routine-share and shot-xG gates are delivered; the broader seven-metric publication contract still needs metric-specific source completeness fields.
 
-## 3. Shareable briefing export, build after the workflow stabilizes
+## 3. Shareable briefing export, delivered
 
 - Problem: stakeholders cannot download the selected interactive state as a concise evidence-linked briefing.
 - Implementation: deterministic HTML/PDF export with selected case, definitions, evidence references, and limitations.
 - Effort: medium.
-- Priority: P1.
+- Priority: P1. Delivered as deterministic self-contained HTML; reliable PDF remains optional follow-up work.
 
 ## 4. Second provider adapter, build only with a licensed sample
 

@@ -7,7 +7,12 @@ from pathlib import Path
 
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
+
+from signalroom.models import EvidenceSequence
+from signalroom.opponent import compare_routines
+from signalroom.reporting import preparation_brief_html
 
 ROOT = Path(__file__).parent
 CASE_ROOT = ROOT / "artifacts" / "cases"
@@ -25,6 +30,9 @@ st.markdown(
     .eyebrow { color:var(--coral); text-transform:uppercase; letter-spacing:.16em; font-weight:800; font-size:.7rem; }
     .hero-title { font-size:clamp(3rem,7vw,6.8rem); line-height:.89; font-weight:850; letter-spacing:-.06em; margin:.55rem 0 1rem; }
     .hero-copy { color:#48677A; font-size:1.1rem; max-width:760px; }
+    .workflow { display:flex; gap:.55rem; flex-wrap:wrap; margin:1rem 0 1.6rem; }
+    .workflow span { background:#E8F1F5; border-radius:99px; padding:.45rem .7rem; font-size:.8rem; font-weight:750; }
+    .workflow b { color:var(--coral); margin-right:.3rem; }
     .signal-card { background:white; border:1px solid #D7E1E6; border-radius:14px; padding:1.2rem; min-height:180px; box-shadow:0 8px 30px rgba(16,42,67,.045); }
     .signal-card h3 { margin:.4rem 0 .65rem; font-size:1.25rem; }
     .reliability { display:inline-block; padding:.23rem .55rem; border-radius:99px; background:#E2F5F1; color:#08766F; font-size:.68rem; font-weight:800; text-transform:uppercase; }
@@ -88,6 +96,55 @@ case_path = labels[selected_label]
 bundle, metrics = load_case(str(case_path))
 case = bundle["case"]
 
+match_ids = metrics["match_id"].astype(int).tolist()
+match_details = case.get("matches_detail") or [
+    {"match_id": int(row.match_id), "date": str(row.date), "opponent": str(row.opponent)}
+    for row in metrics.itertuples()
+]
+max_recent = max(2, min(10, len(match_ids) // 2))
+with st.sidebar:
+    st.markdown("### Preparation setup")
+    st.caption("Advanced controls stay out of the opening view.")
+    recent_n = st.slider("Recent window", 2, max_recent, min(6, max_recent))
+    max_baseline = max(2, len(match_ids) - recent_n)
+    baseline_n = st.slider("Previous window", 2, max_baseline, min(10, max_baseline))
+    dimensions = st.multiselect(
+        "Routine dimensions",
+        ["side", "type", "zone"],
+        default=["side", "type", "zone"],
+        help="Choose how routines are grouped. Use fewer dimensions for broader families.",
+    )
+    minimum_sample = st.slider("Minimum routine sample", 2, 8, 4)
+
+corner_rows = [row for row in bundle["evidence"] if str(row["evidence_id"]).startswith("SP-")]
+corner_sequences = [
+    EvidenceSequence(
+        evidence_id=str(row["evidence_id"]),
+        match_id=int(row["match_id"]),
+        match_date=str(row["match_date"]),
+        opponent=str(row["opponent"]),
+        start_event_id=str(row["start_event_id"]),
+        source_event_ids=tuple(row["source_event_ids"]),
+        label=str(row["label"]),
+        start_minute=int(row["start_minute"]),
+        events=tuple(row["events"]),
+        quality=dict(row.get("quality", {})),
+    )
+    for row in corner_rows
+]
+recent_ids = match_ids[-recent_n:]
+baseline_ids = match_ids[-recent_n - baseline_n : -recent_n]
+routine_comparisons = compare_routines(
+    corner_sequences,
+    {int(row["match_id"]): str(row["date"]) for row in match_details},
+    recent_ids,
+    baseline_ids,
+    dimensions=tuple(dimensions),
+    minimum_sample=minimum_sample,
+    seed=int(bundle["method"].get("bootstrap_seed", 42)),
+    bootstrap_samples=1000,
+)
+
 st.markdown(
     '<div class="eyebrow">Evidence-linked historical briefing</div>', unsafe_allow_html=True
 )
@@ -95,8 +152,12 @@ st.markdown(
     f'<h1 class="hero-title">{escape(str(case["team"]))}</h1>', unsafe_allow_html=True
 )
 st.markdown(
-    '<p class="hero-copy">A prioritized review of match-window changes and attacking-corner routines. '
-    "The system publishes only findings that pass its stability, magnitude, and evidence gates.</p>",
+    '<p class="hero-copy">Evidence-first opponent preparation from recorded match events. '
+    "Find unusual or changing corner routines, then open the sequences behind them.</p>",
+    unsafe_allow_html=True,
+)
+st.markdown(
+    '<div class="workflow"><span><b>1</b>Choose the opponent</span><span><b>2</b>Find unusual or changing routines</span><span><b>3</b>Open the supporting evidence</span></div>',
     unsafe_allow_html=True,
 )
 
@@ -111,10 +172,15 @@ briefing_tab, set_piece_tab, evidence_tab, method_tab = st.tabs(
 )
 
 with briefing_tab:
-    st.subheader("Changes worth analyst attention")
+    st.subheader("What deserves review?")
+    published_routines = [row for row in routine_comparisons if row.publish]
+    if published_routines:
+        st.success(f"{len(published_routines)} routine{'s' if len(published_routines) != 1 else ''} deserve review.")
+    else:
+        st.info("No broad routine difference passed every evidence gate.")
     st.caption(
-        f"Baseline {bundle['method']['baseline_matches']} matches versus the latest "
-        f"{bundle['method']['recent_matches']} matches. Historical analysis only."
+        f"Selected team window: latest {recent_n} matches versus the previous {baseline_n}. "
+        "Historical evidence only."
     )
     findings = bundle["findings"]
     if not findings:
@@ -136,6 +202,18 @@ with briefing_tab:
         case_path / "assets" / "metric_comparison.png",
         "Standardized comparison between baseline and recent match windows",
     )
+    st.subheader("Routine share versus previous team window")
+    if routine_comparisons:
+        chart_frame = pd.DataFrame([
+            {"Routine": row.routine, "Recent share": row.recent_share * 100, "Previous share": row.baseline_share * 100, "Low": row.ci_low * 100, "High": row.ci_high * 100, "n": row.sample_size}
+            for row in routine_comparisons[:8]
+        ])
+        fig = go.Figure()
+        fig.add_bar(x=chart_frame["Routine"], y=chart_frame["Recent share"], name="Recent", marker_color="#007C7C")
+        fig.add_bar(x=chart_frame["Routine"], y=chart_frame["Previous share"], name="Previous", marker_color="#A9BDC7")
+        fig.update_layout(barmode="group", height=420, yaxis_title="Share of attacking corners (%)", xaxis_title=None, legend_title=None, margin=dict(l=20,r=20,t=40,b=100), title="Which corner routines changed share?")
+        st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
+        st.caption("Bars show exact shares. Sample sizes and uncertainty appear in the routine table.")
     render_image(
         case_path / "assets" / "metric_trend.png",
         "Match-by-match trend for the strongest descriptive metric change",
@@ -200,14 +278,46 @@ with set_piece_tab:
             }
         )
         st.dataframe(display, hide_index=True, width="stretch")
+    st.subheader("Comparison observations")
+    quality = bundle["set_piece_lab"].get("quality", {})
+    st.caption("Data quality for the selected source sequences")
+    qcols = st.columns(4)
+    for column, (key, label) in zip(qcols, [("corner_length_complete", "Delivery length"), ("locations_complete", "Locations"), ("movement_endpoints_complete", "Move endpoints"), ("shot_xg_complete", "Shot xG")], strict=True):
+        column.metric(label, f"{float(quality.get(key, 1))*100:.1f}%")
+    st.caption("Routine share is suppressed below 90% completeness. Other metrics can remain valid when their own fields are complete.")
+    comparison_frame = pd.DataFrame([row.to_dict() for row in routine_comparisons])
+    if comparison_frame.empty:
+        st.info("No corner sequences are available for this configuration.")
+    else:
+        visible = comparison_frame[["routine", "count", "baseline_count", "recent_share", "baseline_share", "absolute_share_difference", "ci_low", "ci_high", "stability", "publish", "evidence_ids", "suppression_reasons"]].copy()
+        for column in ["recent_share", "baseline_share", "absolute_share_difference", "ci_low", "ci_high"]:
+            visible[column] = (visible[column] * 100).map(lambda value: f"{value:.1f}%")
+        visible = visible.rename(columns={"routine":"routine", "count":"recent n", "baseline_count":"previous n", "recent_share":"recent share", "baseline_share":"previous share", "absolute_share_difference":"difference", "ci_low":"CI low", "ci_high":"CI high", "publish":"published", "evidence_ids":"evidence", "suppression_reasons":"why suppressed"})
+        st.dataframe(visible, hide_index=True, width="stretch")
+        with st.expander("Why a routine was suppressed"):
+            suppressed = [row.to_dict() for row in routine_comparisons if not row.publish]
+            st.json(suppressed, expanded=False)
+    brief = preparation_brief_html(bundle, [row.to_dict() for row in routine_comparisons], "previous team window", recent_n, baseline_n)
+    st.download_button("Download deterministic briefing", data=brief, file_name=f"{case['slug']}-preparation-brief.html", mime="text/html")
 
 with evidence_tab:
-    st.subheader("Trace every finding to source records")
+    st.subheader("Open the supporting sequences")
     evidence = bundle["evidence"]
+    col_a, col_b, col_c = st.columns(3)
+    with col_a:
+        routine_filter = st.selectbox("Routine", ["All"] + sorted({str(row["label"]) for row in evidence}))
+    with col_b:
+        opponent_filter = st.selectbox("Opponent", ["All"] + sorted({str(row["opponent"]) for row in evidence}))
+    with col_c:
+        outcome_filter = st.selectbox("Outcome", ["All", "Shot-producing", "No shot"])
+    filtered_evidence = [row for row in evidence if (routine_filter == "All" or row["label"] == routine_filter) and (opponent_filter == "All" or row["opponent"] == opponent_filter) and (outcome_filter == "All" or (outcome_filter == "Shot-producing") == any(event.get("type") == "Shot" and event.get("team") == case["team"] for event in row["events"]))]
     options = {
         f"{row['evidence_id']} · {row['match_date']} vs {row['opponent']} · {row['label']}": row
-        for row in evidence
+        for row in filtered_evidence
     }
+    if not options:
+        st.warning("No sequences match these filters.")
+        st.stop()
     selected_evidence = options[st.selectbox("Evidence sequence", list(options))]
     info_cols = st.columns(4)
     info_cols[0].metric("Reference", selected_evidence["evidence_id"])
@@ -243,6 +353,7 @@ with evidence_tab:
             chart.update_layout(height=420, plot_bgcolor="#113D36", paper_bgcolor="#F7F5EF")
             st.plotly_chart(chart, width="stretch")
     st.code("\n".join(selected_evidence["source_event_ids"]), language=None)
+    st.download_button("Export event identifiers", data="\n".join(selected_evidence["source_event_ids"]), file_name=f"{selected_evidence['evidence_id']}-events.txt", mime="text/plain")
 
 with method_tab:
     st.subheader("Publication gates")

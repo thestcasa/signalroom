@@ -87,6 +87,10 @@ def build_case(
             "first_match": matches[0].date,
             "last_match": matches[-1].date,
             "historical_only": True,
+            "matches_detail": [
+                {"match_id": match.match_id, "date": match.date, "opponent": match.away_team if match.home_team == config.team else match.home_team}
+                for match in matches
+            ],
         },
         "data": {
             "provider": ATTRIBUTION,
@@ -113,6 +117,9 @@ def build_case(
             "selection_rule": "|Hedges g| >= 0.5, bootstrap direction >= 0.80, sensitivity >= 2/3, plus q <= 0.20 or stronger effect/stability",
             "short_corner_definition": "first delivery length <= 15 StatsBomb pitch units",
             "shot_rate_definition": "share of corner sequences containing at least one team shot",
+            "comparison_baseline": "selected team previous chronological window; competition-wide routine baseline is not present in this source bundle",
+            "uncertainty_definition": "bootstrap uncertainty for routine-share differences",
+            "stability_definition": "direction under nearby recent-window sizes, with minimum routine sample",
         },
         "product_path": "Narrow SignalRoom MVP with SetPieceLab as the most complete module",
         "findings": findings,
@@ -122,6 +129,12 @@ def build_case(
             "minimum_cluster": 4,
             "published_routines": published_routines,
             "suppressed_routines": [row for row in routine_dicts if not row["publish"]],
+            "quality": {
+                "corner_length_complete": sum(bool(row.quality.get("corner_length_available")) for row in corner_sequences) / len(corner_sequences) if corner_sequences else 0.0,
+                "locations_complete": sum(bool(row.quality.get("locations_complete")) for row in corner_sequences) / len(corner_sequences) if corner_sequences else 0.0,
+                "movement_endpoints_complete": sum(bool(row.quality.get("movement_endpoints_complete")) for row in corner_sequences) / len(corner_sequences) if corner_sequences else 0.0,
+                "shot_xg_complete": sum(bool(row.quality.get("shot_xg_complete")) for row in corner_sequences) / len(corner_sequences) if corner_sequences else 0.0,
+            },
         },
         "evidence": [sequence.to_dict() for sequence in unique_evidence.values()],
     }
