@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "signalroom"
+version = "0.1.0"
+description = "Evidence-linked football tactical briefings from event data"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Alessandro Casadei" }]
+dependencies = [
+  "jinja2>=3.1,<4",
+  "matplotlib>=3.9,<4",
+  "numpy>=2.0,<3",
+  "pandas>=2.2,<3",
+  "plotly>=5.24,<7",
+  "requests>=2.32,<3",
+  "scipy>=1.14,<2",
+  "streamlit>=1.41,<2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3,<9", "pytest-cov>=6,<7", "ruff>=0.8,<1"]
+pdf = ["reportlab>=4.2,<5", "pypdf>=5.1,<6", "pdfplumber>=0.11,<1"]
+
+[project.scripts]
+signalroom = "signalroom.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/signalroom"]
+
+[tool.pytest.ini_options]
+addopts = "-q --strict-markers"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]

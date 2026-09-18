@@ -1,0 +1,14 @@
+slug = "brighton-wsl-2023-24"
+team = "Brighton & Hove Albion WFC"
+competition_id = 37
+season_id = 281
+competition_label = "FA Women's Super League"
+season_label = "2023/2024"
+baseline_matches = 10
+recent_matches = 6
+minimum_baseline_matches = 8
+minimum_recent_matches = 5
+minimum_evidence_sequences = 3
+bootstrap_samples = 2000
+random_seed = 42
+

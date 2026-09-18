@@ -60,4 +60,3 @@ The source data is [StatsBomb Open Data](https://github.com/hudl/open-data). Its
 
 The repository's MIT license applies to SignalRoom's original source code only. It does not relicense StatsBomb data or branding.
 
-

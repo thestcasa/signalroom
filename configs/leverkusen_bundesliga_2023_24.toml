@@ -1,0 +1,14 @@
+slug = "leverkusen-bundesliga-2023-24"
+team = "Bayer Leverkusen"
+competition_id = 9
+season_id = 281
+competition_label = "1. Bundesliga"
+season_label = "2023/2024"
+baseline_matches = 12
+recent_matches = 6
+minimum_baseline_matches = 8
+minimum_recent_matches = 5
+minimum_evidence_sequences = 3
+bootstrap_samples = 2000
+random_seed = 43
+

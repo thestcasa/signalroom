@@ -1,0 +1,2 @@
+I also built SignalRoom, a club-independent football intelligence prototype using StatsBomb Open Data. It turns historical event data into short tactical briefings, but only publishes changes that pass sample, stability, effect-size, and evidence checks. Its first specialist module maps recurring attacking-corner routines and links every output back to the source event sequences. I have included a concise case study and the repository below; it is an independent demonstration using public data, not a claim about current club tactics.
+
