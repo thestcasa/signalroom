@@ -28,6 +28,14 @@ make demo
 
 Open the local URL printed by Streamlit. Raw event files are downloaded from the official source into `data/cache/` and are not committed.
 
+## Deployment
+
+`render.yaml` defines a single free-plan Render web service with no secrets or external infrastructure. It binds Streamlit to Render's `PORT` and uses `/_stcore/health` for health checks. Applying the Blueprint requires selecting the intended Render workspace first:
+
+`https://dashboard.render.com/blueprint/new?repo=https://github.com/thestcasa/signalroom`
+
+Free services can spin down after inactivity and cold-start on the next request. The verified local path remains `make demo`.
+
 To analyze another available team, copy a TOML file in `configs/`, change the team, competition, and season identifiers, then run:
 
 ```bash
@@ -59,4 +67,3 @@ This repository is not affiliated with or endorsed by Brighton & Hove Albion, Ba
 The source data is [StatsBomb Open Data](https://github.com/hudl/open-data). Its README requires StatsBomb attribution and use of its logo when publishing analysis. The data remains subject to the [StatsBomb Public Data User Agreement](https://github.com/hudl/open-data/blob/master/LICENSE.pdf). SignalRoom does not redistribute the raw dataset.
 
 The repository's MIT license applies to SignalRoom's original source code only. It does not relicense StatsBomb data or branding.
-
