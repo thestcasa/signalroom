@@ -11,7 +11,8 @@ import requests
 from ..config import CaseConfig
 from ..models import Event, Match
 
-BASE_URL = "https://raw.githubusercontent.com/hudl/open-data/master/data"
+SOURCE_REVISION = "4b73468fc5b0f1950f9f66fada70ad3a4f9327cb"
+BASE_URL = f"https://raw.githubusercontent.com/hudl/open-data/{SOURCE_REVISION}/data"
 ATTRIBUTION = "StatsBomb Open Data"
 SOURCE_REPOSITORY = "https://github.com/hudl/open-data"
 
@@ -20,7 +21,7 @@ class StatsBombOpenDataAdapter:
     """A cache-first adapter for the documented StatsBomb Open Data layout."""
 
     def __init__(self, cache_dir: str | Path = "data/cache/statsbomb", workers: int = 8):
-        self.cache_dir = Path(cache_dir)
+        self.cache_dir = Path(cache_dir) / SOURCE_REVISION[:12]
         self.workers = workers
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": "SignalRoom/0.1 research case study"})

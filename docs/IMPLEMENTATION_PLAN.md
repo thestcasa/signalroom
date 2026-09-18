@@ -9,4 +9,4 @@
 | Grounded presentation | Complete | Streamlit and static HTML use validated bundle |
 | Two real-data cases | Complete | Brighton and Leverkusen grounded bundles |
 | Outreach package | Complete | One-page PDF, screenshots, concise scripts |
-| Clean-clone audit | Pending final run | Setup, tests, cases, and interface from clean clone |
+| Clean-clone audit | Complete | Remote clone, locked setup, lint, 15 tests, and two bundle checks passed |

@@ -23,7 +23,7 @@ def build_metric_evidence(
     used_possessions: set[tuple[int, int]] = set()
     candidate_events = sorted(
         (event for event in events if event.event_id in requested),
-        key=lambda event: (event.match_id, event.index),
+        key=lambda event: (match_map[event.match_id].date, event.index),
         reverse=True,
     )
     for anchor in candidate_events:

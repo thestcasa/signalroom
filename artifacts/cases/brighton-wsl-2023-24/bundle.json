@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0.0",
-  "generated_at": "2026-09-18T08:53:10+00:00",
+  "generated_at": "2026-09-18T09:10:15+00:00",
   "case": {
     "slug": "brighton-wsl-2023-24",
     "team": "Brighton & Hove Albion WFC",
@@ -14,6 +14,7 @@
   "data": {
     "provider": "StatsBomb Open Data",
     "source_repository": "https://github.com/hudl/open-data",
+    "source_revision": "4b73468fc5b0f1950f9f66fada70ad3a4f9327cb",
     "competition_id": 37,
     "season_id": 281,
     "events": 81809,

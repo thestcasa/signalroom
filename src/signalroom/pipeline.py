@@ -6,7 +6,12 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 
-from .adapters.statsbomb import ATTRIBUTION, SOURCE_REPOSITORY, StatsBombOpenDataAdapter
+from .adapters.statsbomb import (
+    ATTRIBUTION,
+    SOURCE_REPOSITORY,
+    SOURCE_REVISION,
+    StatsBombOpenDataAdapter,
+)
 from .config import CaseConfig
 from .evidence import build_metric_evidence, validate_evidence_references
 from .metrics import METRIC_VERSION, calculate_match_metrics
@@ -88,6 +93,7 @@ def build_case(
         "data": {
             "provider": ATTRIBUTION,
             "source_repository": SOURCE_REPOSITORY,
+            "source_revision": SOURCE_REVISION,
             "competition_id": config.competition_id,
             "season_id": config.season_id,
             "events": len(events),
