@@ -34,7 +34,7 @@ The audit verified 22 Brighton matches, 81,809 events, and 92 attacking corners,
 | Evidence and narrative grounding | Pass for both bundles |
 | Optional dependency audit | No known vulnerabilities after upgrades |
 | PDF | One A4 page, visually verified, text extraction verified |
-| Live baseline deployment | Commit `dde2974`, live, no Render error logs |
+| Final live deployment | Commit `f98c1b9`, deploy `dep-damk0r8u01pc73910sog`, CI passed, no Render error logs |
 | LLM-free operation | Verified, no key or external model dependency exists |
 
 ## Most important findings and repairs
@@ -51,6 +51,8 @@ The audit verified 22 Brighton matches, 81,809 events, and 92 attacking corners,
 10. The live Render service was created outside the Blueprint. Its recorded build command and empty health-check path differ from `render.yaml`. The canonical Blueprint is repaired and lock-based, but the existing service settings require reconciliation in Render.
 
 The machine-readable register in `audit/findings.json` contains reproduction and verification detail for every finding.
+
+Browser evidence is retained in `audit/screenshots/live-before.jpg` and `audit/screenshots/live-after.jpg`. The final deployment was exercised across both historical cases and all four application tabs.
 
 ## Analytical validity
 
