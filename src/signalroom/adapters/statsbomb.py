@@ -122,6 +122,10 @@ class StatsBombOpenDataAdapter:
             subtype=detail.get("type", {}).get("name"),
             xg=(raw.get("shot") or {}).get("statsbomb_xg"),
             raw=raw,
+            player_id=(raw.get("player") or {}).get("id"),
+            team_id=(raw.get("team") or {}).get("id"),
+            recipient=(raw.get("pass") or {}).get("recipient", {}).get("name"),
+            pass_length=(raw.get("pass") or {}).get("length"),
         )
 
 

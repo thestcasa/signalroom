@@ -6,7 +6,7 @@ Event-data dashboards expose many numbers but leave analysts to decide what chan
 
 ## Product
 
-SignalRoom selects a target team through configuration, compares a non-overlapping recent match window with its preceding baseline, suppresses weak changes, and links published findings to event sequences. SetPieceLab applies the same evidence model to attacking corners.
+SignalRoom selects a target opponent through configuration, profiles attacking final-third dead balls, separates repetition from recent change, suppresses weak findings, and links every published category to ordered event sequences. SetPieceLab remains a deeper corner view inside the broader dead-ball workflow.
 
 ## Audience and job
 
@@ -14,5 +14,4 @@ The primary user is a football analyst preparing an initial opposition or retros
 
 ## Delivery decision
 
-Build a narrow SignalRoom MVP with SetPieceLab as its most complete module. Brighton Women 2023/24 provides 22 matches and 92 attacking corners, enough for a historical example. Broad changes are published only when gates pass. Bayer Leverkusen 2023/24 is the portability validation.
-
+Build an evidence-first dead-ball opponent-preparation workflow. Brighton Women 2023/24 and Bayer Leverkusen 2023/24 remain historical demonstrations, not claims about current tactics, club adoption, or affiliation. The fully implemented domain covers corners and final-third free-kick categories from event data; peer prevalence, 360, tracking, video, and defensive-profile recommendations remain gated or planned.

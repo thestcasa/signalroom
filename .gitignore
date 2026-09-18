@@ -11,3 +11,5 @@ tmp/
 *.egg-info/
 .env
 .DS_Store
+*.coverage
+.coverage

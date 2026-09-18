@@ -11,9 +11,12 @@ from .adapters.statsbomb import (
     SOURCE_REVISION,
     StatsBombOpenDataAdapter,
 )
+from .capabilities import capability_notice
 from .config import CaseConfig
+from .deadballs import analyze_attacking_final_third_dead_balls
 from .evidence import build_metric_evidence, validate_evidence_references
 from .metrics import METRIC_VERSION, calculate_match_metrics
+from .ml import profile_publication, team_profile_features
 from .reporting import (
     deterministic_finding_text,
     dump_bundle,
@@ -37,12 +40,15 @@ def build_case(
     metrics, metric_event_ids = calculate_match_metrics(matches, events, config.team)
     comparisons = compare_windows(metrics, config)
     routines, corner_sequences = analyze_attacking_corners(matches, events, config.team)
+    dead_ball_summaries, dead_ball_sequences = analyze_attacking_final_third_dead_balls(
+        matches, events, config.team, SOURCE_REVISION
+    )
 
     output = Path(output_root) / config.slug
     assets = output / "assets"
     assets.mkdir(parents=True, exist_ok=True)
     recent_ids = set(metrics.iloc[-config.recent_matches :]["match_id"].astype(int))
-    evidence = list(corner_sequences)
+    evidence = list(corner_sequences) + list(dead_ball_sequences)
     findings = []
     final_comparisons = []
     for comparison in comparisons:
@@ -77,7 +83,7 @@ def build_case(
     routine_dicts = [routine.to_dict() for routine in routines]
     published_routines = [row for row in routine_dicts if row["publish"]]
     bundle: dict[str, object] = {
-        "schema_version": "1.1.0",
+        "schema_version": "1.2.0",
         "case": {
             "slug": config.slug,
             "team": config.team,
@@ -120,8 +126,11 @@ def build_case(
             "comparison_baseline": "selected team previous chronological window; competition-wide routine baseline is not present in this source bundle",
             "uncertainty_definition": "bootstrap uncertainty for routine-share differences",
             "stability_definition": "direction under nearby recent-window sizes, with minimum routine sample",
+            "dead_ball_taxonomy": "corner, wide attacking free kick, indirect attacking free kick near the box, direct free kick; other restarts are architecture-only",
+            "dead_ball_free_kick_note": "Free-kick categories are event-location buckets, not referee-certified direct/indirect labels.",
         },
-        "product_path": "Narrow SignalRoom MVP with SetPieceLab as the most complete module",
+        "product_path": "Evidence-first dead-ball opponent preparation",
+        "capability": capability_notice("event"),
         "findings": findings,
         "comparisons": [comparison.to_dict() for comparison in final_comparisons],
         "set_piece_lab": {
@@ -135,6 +144,21 @@ def build_case(
                 "movement_endpoints_complete": sum(bool(row.quality.get("movement_endpoints_complete")) for row in corner_sequences) / len(corner_sequences) if corner_sequences else 0.0,
                 "shot_xg_complete": sum(bool(row.quality.get("shot_xg_complete")) for row in corner_sequences) / len(corner_sequences) if corner_sequences else 0.0,
             },
+        },
+        "dead_ball_lab": {
+            "domain": "attacking final-third dead balls",
+            "capability_level": "event",
+            "supported_restart_types": ["corner", "wide_free_kick", "indirect_free_kick", "direct_free_kick"],
+            "architecture_only_restart_types": ["attacking_throw_in", "goal_kick", "kick_off", "penalty", "defensive_dead_ball"],
+            "sequence_count": len(dead_ball_sequences),
+            "summaries": [summary.to_dict() for summary in dead_ball_summaries],
+            "profile_features": team_profile_features(dead_ball_sequences, len(matches)),
+            "ml": profile_publication(0, len(dead_ball_sequences), minimum_team_count=5),
+            "limitations": [
+                "First contact means the first recorded contact-like event, not a verified aerial touch.",
+                "Off-ball movement, screens, marking, and tactical intent cannot be verified from this event-only package.",
+                "Competition peer prevalence is not published unless complete comparable source coverage is loaded.",
+            ],
         },
         "evidence": [sequence.to_dict() for sequence in unique_evidence.values()],
     }

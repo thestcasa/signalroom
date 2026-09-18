@@ -87,3 +87,11 @@ SignalRoom should be presented as an audited historical analysis prototype and e
 The recommended next milestone is a narrow opponent-preparation comparison inside SetPieceLab: compare one selected team’s routine distribution and shot-producing sequences against a competition baseline, expose the underlying sequences, and validate the briefing with two or three football analysts. Do not add an LLM or several broad tactical modules before that workflow proves useful.
 
 See `audit/ROADMAP.md`, `audit/STAKEHOLDER_ASSESSMENT.md`, and `audit/CHANGELOG.md` for concise follow-on material.
+
+## Dead-ball intelligence extension audit
+
+The product extension was rebuilt from the pinned StatsBomb Open Data cache on 18 September 2026. It now writes schema `1.2.0` bundles with 126 Brighton and 310 Leverkusen attacking final-third dead-ball sequences across four event-defined categories: corners, wide free kicks, indirect near-box free kicks, and direct free-kick shots. Independent raw-event recounts matched every category count: Brighton 92 / 19 / 11 / 4 and Leverkusen 236 / 40 / 13 / 21.
+
+The audit specifically falsified restart classification, sequence linkage, first-contact and second-phase extraction, strict JSON, evidence references, repeat-build hashes, app rendering, and ML publication. Both cases produced finite strict JSON, all evidence IDs resolved to source event IDs, and two consecutive real-data builds were byte-identical. The exploratory profile is suppressed because no complete peer feature matrix is loaded. This is the correct product state, not a missing chart.
+
+Residual risks are deliberate and documented: free-kick labels are location buckets rather than referee-certified direct/indirect labels; first contact is the first recorded contact-like event rather than a verified aerial touch; event data cannot verify off-ball movement, screens, marking, or intent; and no competition prevalence, tracking, video, or external analyst validation is claimed. The current Render configuration drift and free-plan cold start remain operational risks from the prior audit.

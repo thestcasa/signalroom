@@ -38,3 +38,12 @@
 - Implemented the strongest valid current baseline: recent selected-team window versus previous selected-team window.
 - Added regression coverage for denominator correctness, suppression reasons, stability labels, and briefing determinism.
 - Prepared `docs/ANALYST_VALIDATION_PACKAGE.md`; no external analyst validation is claimed yet.
+
+## Dead-ball intelligence extension
+
+- Added a provider-neutral `DeadBallSequence` contract and capability registry.
+- Implemented attacking final-third corners, wide free kicks, indirect near-box free kicks, and direct free-kick shots from event data.
+- Added first recorded contact, second-phase continuation, delivery target, player recurrence, shot/xG outcomes, quality fields, evidence IDs, and explicit suppression reasons.
+- Added an interpretable team profile feature vector with a conservative ML gate; current cases suppress clustering because no complete peer matrix is loaded.
+- Added a dedicated Dead-ball Lab, capability warnings, broader evidence filters, data-source research, and schema `1.2.0` compatibility handling.
+- Independently recomputed category counts and verified strict JSON, evidence resolution, deterministic builds, 29 tests, and 90% total coverage.

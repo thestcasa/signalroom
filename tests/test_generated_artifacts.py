@@ -14,7 +14,16 @@ def test_two_real_case_bundles_are_grounded_and_portable():
         assert validate_grounded_bundle(bundle) == []
         assert bundle["set_piece_lab"]["corner_count"] > 0
         assert bundle["case"]["historical_only"] is True
-        assert bundle["schema_version"] == "1.1.0"
+        assert bundle["schema_version"] == "1.2.0"
+        assert bundle["capability"]["level"] == "event"
+        assert bundle["dead_ball_lab"]["sequence_count"] > bundle["set_piece_lab"]["corner_count"]
+        assert {row["restart_type"] for row in bundle["dead_ball_lab"]["summaries"]} == {
+            "corner",
+            "wide_free_kick",
+            "indirect_free_kick",
+            "direct_free_kick",
+        }
+        assert bundle["dead_ball_lab"]["ml"]["status"] == "suppressed"
         assert "generated_at" not in bundle
         assert (path.parent / "report.html").exists()
         assert (path.parent / "assets" / "statsbomb-open-data-logo.png").exists()

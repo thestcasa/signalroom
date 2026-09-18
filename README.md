@@ -13,7 +13,9 @@ The product follows a focused opponent-preparation workflow: choose a historical
 - Seven versioned team metrics
 - Non-overlapping baseline and recent windows
 - Match-level bootstrap intervals, permutation tests, effect sizes, sensitivity checks, and false-discovery control
-- Deterministic attacking-corner routine groups
+- Deterministic attacking final-third dead-ball sequences: corners, wide free kicks, indirect near-box free kicks, and direct free-kick shots
+- Delivery, first recorded contact, second phase, player recurrence, shot and xG outcomes where valid
+- Capability registry distinguishing event data from future 360, tracking, and video support
 - Event-level evidence references for every published finding
 - Grounded, template-based reports that need no LLM
 - Interactive Streamlit analyst interface and static HTML exports
@@ -52,6 +54,9 @@ To analyze another available team, copy a TOML file in `configs/`, change the te
 - `src/signalroom/metrics.py`: metric definitions and calculations
 - `src/signalroom/statistics.py`: change detection and suppression
 - `src/signalroom/setpieces.py`: corner sequence and routine analysis
+- `src/signalroom/deadballs.py`: provider-neutral final-third dead-ball taxonomy and sequence contract
+- `src/signalroom/capabilities.py`: data capability registry and publication language
+- `src/signalroom/ml.py`: interpretable profile features and conservative ML publication gate
 - `src/signalroom/opponent.py`: comparison baseline, uncertainty, completeness, and stability logic
 - `src/signalroom/evidence.py`: event trace construction
 - `src/signalroom/reporting.py`: deterministic narrative and grounding checks
@@ -72,7 +77,9 @@ The default comparison is the selected team's latest chronological match window 
 
 The interface publishes a routine only when the recent sample, routine-share completeness, and comparison evidence gates pass. Bootstrap intervals show uncertainty around share differences. Nearby-window sensitivity produces stakeholder labels such as `stable`, `directionally consistent`, `sensitive to window selection`, or `sample too small`.
 
-The Evidence room filters by routine, opponent, and shot outcome, shows the ordered event sequence and pitch view, and exports source event identifiers. The briefing download is deterministic HTML, not an automated tactical essay.
+The Evidence room filters by restart or routine, opponent, and shot outcome, shows the ordered event sequence and pitch view, and exports source event identifiers. The briefing download is deterministic HTML, not an automated tactical essay.
+
+The default case answers: “What does this opponent repeatedly record from attacking final-third dead balls, what is changing, and which sequences deserve review?” It does not publish a competition baseline when complete comparable team coverage is not loaded. The exploratory team profile is suppressed until a reproducible peer matrix and stability check are available.
 
 ## Data terms and attribution
 

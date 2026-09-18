@@ -47,3 +47,11 @@ Useful only after repeated use demonstrates a need to save, reject, or discuss s
 - A multi-tenant production platform
 
 These would add surface area before SignalRoom has validated one recurring analyst decision.
+
+## Dead-ball platform follow-on
+
+- Add complete peer/competition loading only after coverage completeness and denominator rules are verified.
+- Add a second licensed provider adapter or a public tracking adapter, with semantic known-fixture tests.
+- Add 360/tracking capability only where the source package actually contains those positions.
+- Add video references only after legitimate synchronized video access exists.
+- Extend the same contract to attacking throw-ins, goal kicks, kick-offs, penalties, defensive restarts, and defensive profile review.

@@ -4,16 +4,16 @@ External analyst validation has not yet occurred. This package is ready for two 
 
 ## Task
 
-Give the analyst one historical opponent case and ask: “In five minutes, identify any attacking-corner routine that deserves review, state how confident you are, and open one supporting sequence.”
+Give the analyst one historical opponent case and ask: “In five minutes, identify the opponent’s most distinctive attacking dead-ball behaviour, choose one pattern worth review, open its supporting sequence, and state what you would ask the set-piece team to examine.”
 
 ## Test script
 
 1. Start from the opening screen without explanation.
 2. Record time to state the product purpose.
-3. Ask the analyst to select a recent and previous window.
-4. Ask them to identify one published or suppressed routine.
-5. Ask them to open and explain one supporting sequence.
-6. Ask them to download the briefing.
+3. Ask them to identify one repeated or recent dead-ball observation.
+4. Ask them to select one pattern worth review and open a supporting sequence.
+5. Ask what should be reviewed by coaching or the set-piece team, without prescribing a solution.
+6. Ask them to download or summarize the preparation briefing.
 7. Do not correct them during the task.
 
 ## Correctness checks and measures

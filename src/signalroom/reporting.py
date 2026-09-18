@@ -34,6 +34,12 @@ def validate_grounded_bundle(bundle: dict[str, object]) -> list[str]:
         missing = set(routine["evidence_ids"]) - evidence
         if missing:
             errors.append(f"Missing routine evidence: {sorted(missing)}")
+    for summary in bundle.get("dead_ball_lab", {}).get("summaries", []):
+        missing = set(summary.get("evidence_ids", [])) - evidence
+        if missing:
+            errors.append(f"Missing dead-ball evidence: {sorted(missing)}")
+        if summary.get("publication") == "published descriptive" and not summary.get("evidence_ids"):
+            errors.append(f"Published dead-ball category has no evidence: {summary.get('restart_type')}")
     return errors
 
 
@@ -56,10 +62,12 @@ def write_html_report(bundle: dict[str, object], output: Path) -> None:
     <title>SignalRoom | {escape(str(bundle["case"]["team"]))}</title><style>{_css()}</style></head>
     <body><header><div class="brand">SIGNAL<span>ROOM</span></div><div class="tag">Evidence-linked football intelligence</div></header>
     <main><section class="hero"><div><div class="eyebrow">Historical case study · {escape(str(bundle["case"]["season"]))}</div>
-    <h1>{escape(str(bundle["case"]["team"]))}</h1><p class="lede">A cautious match-window review with a complete attacking-corner evidence trail.</p></div>
-    <div class="stat"><b>{bundle["case"]["matches"]}</b><span>matches</span><b>{bundle["set_piece_lab"]["corner_count"]}</b><span>corners</span></div></section>
+    <h1>{escape(str(bundle["case"]["team"]))}</h1><p class="lede">An evidence-first review of repeated and changing attacking final-third dead-ball behaviours.</p></div>
+    <div class="stat"><b>{bundle["case"]["matches"]}</b><span>matches</span><b>{bundle.get("dead_ball_lab", {}).get("sequence_count", 0)}</b><span>dead balls</span></div></section>
     <section><div class="section-head"><div><div class="eyebrow">SignalRoom</div><h2>Changes worth analyst attention</h2></div><p>Baseline: {bundle["method"]["baseline_matches"]} matches · Recent: {bundle["method"]["recent_matches"]} matches</p></div>
     <div class="grid">{finding_cards}</div><img class="wide" src="assets/metric_comparison.png" alt="Metric comparison"></section>
+    <section><div class="section-head"><div><div class="eyebrow">Dead-ball Lab</div><h2>Attacking final-third dead balls</h2></div><p>Event-only descriptive categories with evidence IDs.</p></div>
+    <p>Supported categories: corner, wide free kick, indirect free kick near the box, and direct free kick. Free-kick labels are location buckets, not referee-certified direct/indirect status. Video is not available in this data package.</p></section>
     <section><div class="section-head"><div><div class="eyebrow">SetPieceLab</div><h2>Attacking corner routines</h2></div><p>Clusters below require at least four examples.</p></div>
     <div class="split"><img src="assets/corner_map.png" alt="Corner delivery map"><img src="assets/routine_shares.png" alt="Routine shares"></div>
     <table><thead><tr><th>Routine</th><th>n</th><th>Share</th><th>Corners with shot</th><th>Conversion</th><th>Total shots</th><th>xG</th></tr></thead><tbody>{routines}</tbody></table></section>

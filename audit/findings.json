@@ -225,6 +225,54 @@
       "resolution": "Documentation states that additional providers can be added later and avoids unsupported compatibility claims.",
       "repaired": true,
       "verification": "No club names occur in analytical logic; provider claims are qualified."
+    },
+    {
+      "id": "SR-A-004",
+      "category": "analytical-validity",
+      "severity": "medium",
+      "verified": true,
+      "component": "Attacking final-third dead-ball classification",
+      "evidence": "The two real bundles contain 126 Brighton and 310 Leverkusen supported dead-ball sequences across four explicit categories.",
+      "reproduction": "Recount raw StatsBomb Pass and Shot events using the documented subtype and final-third location rules.",
+      "actual_behavior": "Independent counts match Brighton 92 corners, 19 wide free kicks, 11 indirect free kicks, 4 direct free kicks and Leverkusen 236, 40, 13, 21.",
+      "expected_behavior": "A category must be reproducible and must disclose that free-kick labels are location buckets.",
+      "root_cause": "The former product exposed only corner routines.",
+      "impact": "The product would otherwise overstate domain coverage and analyst usefulness.",
+      "resolution": "Added DeadBallSequence, four supported categories, first-contact and second-phase fields, quality gates, and capability labels.",
+      "repaired": true,
+      "verification": "Raw-event recount matched both bundles; 29 tests pass and artifacts are strict JSON."
+    },
+    {
+      "id": "SR-M-001",
+      "category": "machine-learning",
+      "severity": "medium",
+      "verified": true,
+      "component": "Team profiling and clustering",
+      "evidence": "Current case bundles do not load a complete comparable peer feature matrix.",
+      "reproduction": "Inspect dead_ball_lab.ml in both generated bundles.",
+      "actual_behavior": "The interpretable profile feature vector is retained, but clustering is suppressed with a coverage reason.",
+      "expected_behavior": "ML must not appear as a tactical discovery claim without peer coverage, stability, and evidence.",
+      "root_cause": "The legitimate source bundle is selected-team coverage rather than a complete competition dead-ball sample.",
+      "impact": "Publishing a cluster would create false precision.",
+      "resolution": "Added a deterministic ML publication gate and documented the future peer matrix requirement.",
+      "repaired": true,
+      "verification": "Both cases explicitly report suppressed descriptive grouping; no ML narrative is promoted."
+    },
+    {
+      "id": "SR-U-003",
+      "category": "product-ux",
+      "severity": "medium",
+      "verified": true,
+      "component": "Dead-ball workflow",
+      "evidence": "The app now exposes opponent selection, a Dead-ball Lab, capability warning, five tabs, and a unified evidence room for corner and free-kick sequences.",
+      "reproduction": "Run Streamlit AppTest and inspect the five tab labels and evidence filters.",
+      "actual_behavior": "The app loads both cases without exceptions and opens ordered evidence events for all supported categories.",
+      "expected_behavior": "An analyst should see what deserves review, why the finding is supported, and what the data cannot verify.",
+      "root_cause": "The former opening workflow was centered on a corner-only module.",
+      "impact": "The previous UI undersold the broader opponent-preparation workflow.",
+      "resolution": "Added final-third dead-ball summary, capability copy, restart filters, recurrence fields, and explicit event-only language.",
+      "repaired": true,
+      "verification": "AppTest passes with zero exceptions; mobile CSS remains a documented visual follow-up."
     }
   ]
 }

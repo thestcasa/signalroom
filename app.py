@@ -95,6 +95,7 @@ selected_label = st.selectbox("Historical case", list(labels), label_visibility=
 case_path = labels[selected_label]
 bundle, metrics = load_case(str(case_path))
 case = bundle["case"]
+dead_ball_lab = bundle.get("dead_ball_lab", {})
 
 match_ids = metrics["match_id"].astype(int).tolist()
 match_details = case.get("matches_detail") or [
@@ -144,6 +145,7 @@ routine_comparisons = compare_routines(
     seed=int(bundle["method"].get("bootstrap_seed", 42)),
     bootstrap_samples=1000,
 )
+dead_ball_rows = [row for row in bundle["evidence"] if str(row["evidence_id"]).startswith("DB-")]
 
 st.markdown(
     '<div class="eyebrow">Evidence-linked historical briefing</div>', unsafe_allow_html=True
@@ -153,7 +155,7 @@ st.markdown(
 )
 st.markdown(
     '<p class="hero-copy">Evidence-first opponent preparation from recorded match events. '
-    "Find unusual or changing corner routines, then open the sequences behind them.</p>",
+    "Find repeated or changing dead-ball behaviours, then open the sequences behind them.</p>",
     unsafe_allow_html=True,
 )
 st.markdown(
@@ -164,11 +166,11 @@ st.markdown(
 metric_cols = st.columns(4)
 metric_cols[0].metric("Matches", case["matches"])
 metric_cols[1].metric("Source events", f"{bundle['data']['events']:,}")
-metric_cols[2].metric("Attacking corners", bundle["set_piece_lab"]["corner_count"])
+metric_cols[2].metric("Final-third dead balls", dead_ball_lab.get("sequence_count", 0))
 metric_cols[3].metric("Published changes", len(bundle["findings"]))
 
-briefing_tab, set_piece_tab, evidence_tab, method_tab = st.tabs(
-    ["Briefing", "SetPieceLab", "Evidence room", "Method & limits"]
+briefing_tab, dead_ball_tab, set_piece_tab, evidence_tab, method_tab = st.tabs(
+    ["Briefing", "Dead-ball Lab", "SetPieceLab", "Evidence room", "Method & limits"]
 )
 
 with briefing_tab:
@@ -235,6 +237,39 @@ with briefing_tab:
             hide_index=True,
             width="stretch",
         )
+
+with dead_ball_tab:
+    st.subheader("Attacking final-third dead balls")
+    st.caption(
+        "What this opponent records most often, what repeats across matches, and what deserves review. "
+        "All findings are event-only and descriptive."
+    )
+    summaries = pd.DataFrame(dead_ball_lab.get("summaries", []))
+    if summaries.empty:
+        st.info("No supported final-third dead-ball sequences are available.")
+    else:
+        display = summaries[["restart_type", "count", "matches", "rate_per_match", "share", "total_shots", "shot_producing_rate", "total_xg", "xg_per_restart", "second_phase_rate", "repetition_matches", "publication"]].copy()
+        for column in ["share", "shot_producing_rate", "second_phase_rate"]:
+            display[column] = (display[column] * 100).map(lambda value: f"{value:.1f}%")
+        for column in ["rate_per_match", "xg_per_restart"]:
+            display[column] = display[column].map(lambda value: "n/a" if pd.isna(value) else f"{value:.2f}")
+        display["total_xg"] = display["total_xg"].map(lambda value: "n/a" if pd.isna(value) else f"{value:.2f}")
+        st.dataframe(display.rename(columns={"restart_type": "restart", "count": "n", "matches": "matches with sequence", "rate_per_match": "per match", "share": "share", "total_shots": "shots", "shot_producing_rate": "shot-producing rate", "total_xg": "xG", "xg_per_restart": "xG / restart", "second_phase_rate": "second-phase rate", "repetition_matches": "repetition across matches"}), hide_index=True, width="stretch")
+        selected_restart = st.selectbox("Restart type", ["All"] + list(summaries["restart_type"]))
+        if selected_restart != "All":
+            selected_summary = next(row for row in dead_ball_lab["summaries"] if row["restart_type"] == selected_restart)
+            st.write({
+                "first-contact zones": selected_summary["first_contact_zones"],
+                "delivery targets": selected_summary["delivery_targets"],
+                "recurring players": selected_summary["recurring_players"],
+                "recurring combinations": selected_summary["recurring_combinations"],
+                "review questions": selected_summary["review_questions"],
+                "publication": selected_summary["publication"],
+                "suppression reasons": selected_summary["suppression_reasons"],
+            })
+    st.info("Capability: Level 1 event data. Video is not available in this data package, so off-ball movement, screens, marking and intent are not verified.")
+    st.subheader("Exploratory team profile")
+    st.write(dead_ball_lab.get("ml", {"status": "suppressed", "reason": "not available"}))
 
 with set_piece_tab:
     st.subheader("Attacking corner routines")
@@ -303,16 +338,28 @@ with set_piece_tab:
 with evidence_tab:
     st.subheader("Open the supporting sequences")
     evidence = bundle["evidence"]
+    def evidence_label(row: dict) -> str:
+        return str(row.get("label") or row.get("restart_type") or "sequence")
+
+    def evidence_events(row: dict) -> list[dict]:
+        return list(row.get("events") or row.get("ordered_events") or [])
+
+    def evidence_minute(row: dict) -> int:
+        if "start_minute" in row:
+            return int(row["start_minute"])
+        first = evidence_events(row)
+        return int(first[0].get("minute", 0)) if first else 0
+
     col_a, col_b, col_c = st.columns(3)
     with col_a:
-        routine_filter = st.selectbox("Routine", ["All"] + sorted({str(row["label"]) for row in evidence}))
+        routine_filter = st.selectbox("Restart or routine", ["All"] + sorted({evidence_label(row) for row in evidence}))
     with col_b:
         opponent_filter = st.selectbox("Opponent", ["All"] + sorted({str(row["opponent"]) for row in evidence}))
     with col_c:
         outcome_filter = st.selectbox("Outcome", ["All", "Shot-producing", "No shot"])
-    filtered_evidence = [row for row in evidence if (routine_filter == "All" or row["label"] == routine_filter) and (opponent_filter == "All" or row["opponent"] == opponent_filter) and (outcome_filter == "All" or (outcome_filter == "Shot-producing") == any(event.get("type") == "Shot" and event.get("team") == case["team"] for event in row["events"]))]
+    filtered_evidence = [row for row in evidence if (routine_filter == "All" or evidence_label(row) == routine_filter) and (opponent_filter == "All" or row["opponent"] == opponent_filter) and (outcome_filter == "All" or (outcome_filter == "Shot-producing") == any(event.get("type") == "Shot" and event.get("team") == case["team"] for event in evidence_events(row)))]
     options = {
-        f"{row['evidence_id']} · {row['match_date']} vs {row['opponent']} · {row['label']}": row
+        f"{row['evidence_id']} · {row['match_date']} vs {row['opponent']} · {evidence_label(row)}": row
         for row in filtered_evidence
     }
     if not options:
@@ -322,9 +369,9 @@ with evidence_tab:
     info_cols = st.columns(4)
     info_cols[0].metric("Reference", selected_evidence["evidence_id"])
     info_cols[1].metric("Match ID", selected_evidence["match_id"])
-    info_cols[2].metric("Minute", selected_evidence["start_minute"])
+    info_cols[2].metric("Minute", evidence_minute(selected_evidence))
     info_cols[3].metric("Source events", len(selected_evidence["source_event_ids"]))
-    event_frame = pd.DataFrame(selected_evidence["events"])
+    event_frame = pd.DataFrame(evidence_events(selected_evidence))
     st.dataframe(event_frame, hide_index=True, width="stretch")
     locations = event_frame.dropna(subset=["location"])
     if not locations.empty:
@@ -358,6 +405,10 @@ with evidence_tab:
 with method_tab:
     st.subheader("Publication gates")
     st.write(bundle["method"]["selection_rule"])
+    st.write("Capability registry", bundle.get("capability", {}))
+    st.write("Supported dead-ball taxonomy", dead_ball_lab.get("supported_restart_types", []))
+    st.write("Architecture-only future domains", dead_ball_lab.get("architecture_only_restart_types", []))
+    st.caption("Peer prevalence is not published unless complete comparable source coverage is loaded. Recent change and repetition are separate questions.")
     st.json(bundle["method"], expanded=True)
     st.subheader("Metric definitions")
     definitions = pd.DataFrame(bundle["comparisons"])[["label", "definition", "unit"]]
