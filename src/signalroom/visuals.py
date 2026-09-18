@@ -38,26 +38,28 @@ def metric_comparison_chart(comparisons: list[MetricComparison], output: Path) -
     ax.axvline(0, color=INK, linewidth=0.9)
     ax.set_xlabel("Hedges g (recent window relative to baseline)")
     title = "Published standardized changes" if published else "Strongest descriptive changes"
-    ax.set_title(title, loc="left", color=INK, fontsize=16, weight="bold")
+    ax.set_title(title, loc="left", color=INK, fontsize=16, weight="bold", pad=30)
     if not published:
         ax.text(
             0,
-            1.01,
+            1.015,
             "None passed every publication gate",
             transform=ax.transAxes,
             color="#587287",
             fontsize=9,
+            va="bottom",
         )
     for index, item in enumerate(displayed):
         value = effects[index]
         detail = f"{item.baseline_value:.2f} → {item.recent_value:.2f} {item.unit}"
+        annotation_x = value if value >= 0 else 0.0
         ax.annotate(
             detail,
-            xy=(value, index),
-            xytext=(6 if value >= 0 else -6, 0),
+            xy=(annotation_x, index),
+            xytext=(6, 0),
             textcoords="offset points",
             va="center",
-            ha="left" if value >= 0 else "right",
+            ha="left",
             fontsize=8,
             color=INK,
         )
