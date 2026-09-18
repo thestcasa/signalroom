@@ -2,16 +2,22 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
-  test:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
         with:
-          python-version: "3.12"
-      - run: uv sync --extra dev
-      - run: .venv/bin/python -m ruff check src tests app.py scripts
-      - run: .venv/bin/python -m pytest
+          version: "0.12.15"
+          enable-cache: true
+      - run: uv sync --frozen --python 3.12 --extra dev --extra pdf
+      - run: make lint
+      - run: make test

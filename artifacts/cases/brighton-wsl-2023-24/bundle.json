@@ -1,6 +1,5 @@
 {
-  "schema_version": "1.0.0",
-  "generated_at": "2026-09-18T09:10:15+00:00",
+  "schema_version": "1.1.0",
   "case": {
     "slug": "brighton-wsl-2023-24",
     "team": "Brighton & Hove Albion WFC",
@@ -22,6 +21,9 @@
       "matches": 22,
       "events": 81809,
       "missing_locations": 697,
+      "missing_move_end_locations": 0,
+      "shots_missing_xg": 0,
+      "corners_missing_length": 0,
       "duplicate_event_ids": 0
     },
     "limitations": [
@@ -32,12 +34,15 @@
   },
   "method": {
     "metric_version": "1.0.0",
+    "set_piece_version": "1.1.0",
     "baseline_matches": 10,
     "recent_matches": 6,
     "minimum_evidence_sequences": 3,
     "bootstrap_samples": 2000,
     "multiple_comparison_control": "Benjamini-Hochberg",
-    "selection_rule": "|Hedges g| >= 0.5, bootstrap direction >= 0.80, sensitivity >= 2/3, plus q <= 0.20 or stronger effect/stability"
+    "selection_rule": "|Hedges g| >= 0.5, bootstrap direction >= 0.80, sensitivity >= 2/3, plus q <= 0.20 or stronger effect/stability",
+    "short_corner_definition": "first delivery length <= 15 StatsBomb pitch units",
+    "shot_rate_definition": "share of corner sequences containing at least one team shot"
   },
   "product_path": "Narrow SignalRoom MVP with SetPieceLab as the most complete module",
   "findings": [],
@@ -211,6 +216,7 @@
         "share_ci_low": 0.3894853752162455,
         "share_ci_high": 0.5896468596379305,
         "shots": 17,
+        "corners_with_shot": 17,
         "xg": 1.909917287,
         "shot_rate": 0.37777777777777777,
         "evidence_ids": [
@@ -228,19 +234,20 @@
         "delivery_side": "left",
         "delivery_type": "direct",
         "target_zone": "central goalmouth",
-        "count": 34,
-        "share": 0.3695652173913043,
-        "share_ci_low": 0.27801481252642296,
-        "share_ci_high": 0.4715720057236897,
+        "count": 35,
+        "share": 0.3804347826086957,
+        "share_ci_low": 0.28791001894905327,
+        "share_ci_high": 0.48254456444688343,
         "shots": 10,
+        "corners_with_shot": 8,
         "xg": 1.542034702,
-        "shot_rate": 0.29411764705882354,
+        "shot_rate": 0.22857142857142856,
         "evidence_ids": [
           "SP-3912596-2554",
           "SP-3912599-833",
+          "SP-3912599-872",
           "SP-3913074-325",
-          "SP-3913077-2328",
-          "SP-3913077-2499"
+          "SP-3913077-2328"
         ],
         "publish": true,
         "reliability": "descriptive"
@@ -250,39 +257,20 @@
         "delivery_side": "right",
         "delivery_type": "direct",
         "target_zone": "near-side channel",
-        "count": 4,
-        "share": 0.043478260869565216,
-        "share_ci_low": 0.017035440611580622,
-        "share_ci_high": 0.10651842326381375,
-        "shots": 2,
-        "xg": 0.222775416,
+        "count": 6,
+        "share": 0.06521739130434782,
+        "share_ci_low": 0.030229791373983947,
+        "share_ci_high": 0.13505960279305834,
+        "shots": 3,
+        "corners_with_shot": 3,
+        "xg": 0.242964716,
         "shot_rate": 0.5,
         "evidence_ids": [
           "SP-3912599-1440",
+          "SP-3913077-2501",
           "SP-3913099-165",
           "SP-3913137-1772",
           "SP-3913137-3043"
-        ],
-        "publish": true,
-        "reliability": "descriptive"
-      },
-      {
-        "routine": "left / short / short option",
-        "delivery_side": "left",
-        "delivery_type": "short",
-        "target_zone": "short option",
-        "count": 4,
-        "share": 0.043478260869565216,
-        "share_ci_low": 0.017035440611580622,
-        "share_ci_high": 0.10651842326381375,
-        "shots": 1,
-        "xg": 0.1453203,
-        "shot_rate": 0.25,
-        "evidence_ids": [
-          "SP-3912596-3673",
-          "SP-3912599-872",
-          "SP-3913106-1096",
-          "SP-3913146-2833"
         ],
         "publish": true,
         "reliability": "descriptive"
@@ -290,21 +278,21 @@
     ],
     "suppressed_routines": [
       {
-        "routine": "right / short / short option",
-        "delivery_side": "right",
+        "routine": "left / short / short option",
+        "delivery_side": "left",
         "delivery_type": "short",
         "target_zone": "short option",
-        "count": 3,
-        "share": 0.03260869565217391,
-        "share_ci_low": 0.011150975342623229,
-        "share_ci_high": 0.09153512338694722,
+        "count": 2,
+        "share": 0.021739130434782608,
+        "share_ci_low": 0.00598191583767091,
+        "share_ci_high": 0.07583641774607561,
         "shots": 1,
-        "xg": 0.0201893,
-        "shot_rate": 0.3333333333333333,
+        "corners_with_shot": 1,
+        "xg": 0.1453203,
+        "shot_rate": 0.5,
         "evidence_ids": [
-          "SP-3913077-2501",
-          "SP-3913157-1855",
-          "SP-3913182-832"
+          "SP-3912596-3673",
+          "SP-3913146-2833"
         ],
         "publish": false,
         "reliability": "suppressed: fewer than 4 corners"
@@ -319,11 +307,50 @@
         "share_ci_low": 0.00598191583767091,
         "share_ci_high": 0.07583641774607561,
         "shots": 1,
+        "corners_with_shot": 1,
         "xg": 0.025444726,
         "shot_rate": 0.5,
         "evidence_ids": [
           "SP-3912599-727",
           "SP-3913097-1816"
+        ],
+        "publish": false,
+        "reliability": "suppressed: fewer than 4 corners"
+      },
+      {
+        "routine": "left / direct / near-side channel",
+        "delivery_side": "left",
+        "delivery_type": "direct",
+        "target_zone": "near-side channel",
+        "count": 1,
+        "share": 0.010869565217391304,
+        "share_ci_low": 0.0019212795763616508,
+        "share_ci_high": 0.05902928886156092,
+        "shots": 0,
+        "corners_with_shot": 0,
+        "xg": 0.0,
+        "shot_rate": 0.0,
+        "evidence_ids": [
+          "SP-3913106-1096"
+        ],
+        "publish": false,
+        "reliability": "suppressed: fewer than 4 corners"
+      },
+      {
+        "routine": "right / short / short option",
+        "delivery_side": "right",
+        "delivery_type": "short",
+        "target_zone": "short option",
+        "count": 1,
+        "share": 0.010869565217391304,
+        "share_ci_low": 0.0019212795763616508,
+        "share_ci_high": 0.05902928886156092,
+        "shots": 0,
+        "corners_with_shot": 0,
+        "xg": 0.0,
+        "shot_rate": 0.0,
+        "evidence_ids": [
+          "SP-3913157-1855"
         ],
         "publish": false,
         "reliability": "suppressed: fewer than 4 corners"
@@ -1145,7 +1172,7 @@
         "087b77b9-2bd5-47ba-8778-e38aab167539",
         "faf9481f-05d4-4d0a-9783-da96eb2f3354"
       ],
-      "label": "left / short / short option",
+      "label": "left / direct / central goalmouth",
       "start_minute": 21,
       "events": [
         {
@@ -2771,7 +2798,7 @@
         "28e90f32-d5bf-445e-afd8-cbd4a546df0e",
         "d69b21f8-0e22-4a2b-b544-89b180004b6b"
       ],
-      "label": "right / short / short option",
+      "label": "right / direct / near-side channel",
       "start_minute": 61,
       "events": [
         {
@@ -6514,7 +6541,7 @@
         "b173ac41-bcbc-48ac-856b-9a4794aa929b",
         "640a296e-1f87-4618-bc7d-422fcf5a5146"
       ],
-      "label": "left / short / short option",
+      "label": "left / direct / near-side channel",
       "start_minute": 27,
       "events": [
         {
@@ -17648,7 +17675,7 @@
         "b1e1a583-2753-4745-aac4-fb31a5643260",
         "a6a7b494-449b-4915-947f-08919df8f517"
       ],
-      "label": "right / short / short option",
+      "label": "right / direct / near-side channel",
       "start_minute": 22,
       "events": [
         {

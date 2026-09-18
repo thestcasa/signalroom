@@ -41,6 +41,9 @@ def test_temporal_windows_do_not_use_future_rows():
     comparisons = compare_windows(pd.DataFrame(rows), _config())
     assert all(item.baseline_value == 2 for item in comparisons)
     assert all(item.recent_value == 12 for item in comparisons)
+    assert all(item.standardized_effect is None for item in comparisons)
+    assert not any(item.publish for item in comparisons)
+    assert all("zero pooled variance" in (item.suppression_reason or "") for item in comparisons)
 
 
 def test_negligible_changes_are_suppressed():

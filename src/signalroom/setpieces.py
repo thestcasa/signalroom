@@ -18,6 +18,7 @@ class CornerRoutine:
     share_ci_low: float
     share_ci_high: float
     shots: int
+    corners_with_shot: int
     xg: float
     shot_rate: float
     evidence_ids: tuple[str, ...]
@@ -48,11 +49,11 @@ def analyze_attacking_corners(
             following = _corner_sequence(corner, match_events, positions[corner.event_id])
             delivery_side = "left" if (corner.y or 0) < 40 else "right"
             length = (corner.raw.get("pass") or {}).get("length")
-            is_short = (length is not None and float(length) <= 15.0) or (
-                corner.end_x is not None and corner.end_x < 108
-            )
-            delivery_type = "short" if is_short else "direct"
-            target_zone = _target_zone(corner, delivery_side, is_short)
+            if length is None:
+                delivery_type = "unknown"
+            else:
+                delivery_type = "short" if float(length) <= 15.0 else "direct"
+            target_zone = _target_zone(corner, delivery_side, delivery_type)
             routine = f"{delivery_side} / {delivery_type} / {target_zone}"
             shots = [
                 event for event in following if event.team == team and event.event_type == "Shot"
@@ -80,6 +81,7 @@ def analyze_attacking_corners(
                     "delivery_type": delivery_type,
                     "target_zone": target_zone,
                     "shots": len(shots),
+                    "has_shot": bool(shots),
                     "xg": sum(float(shot.xg or 0) for shot in shots),
                     "evidence_id": evidence_id,
                 }
@@ -93,6 +95,7 @@ def analyze_attacking_corners(
         count = len(group)
         ci_low, ci_high = _wilson_interval(count, total)
         shots = sum(int(row["shots"]) for row in group)
+        corners_with_shot = sum(bool(row["has_shot"]) for row in group)
         publish = count >= minimum_cluster
         routines.append(
             CornerRoutine(
@@ -105,8 +108,9 @@ def analyze_attacking_corners(
                 share_ci_low=ci_low,
                 share_ci_high=ci_high,
                 shots=shots,
+                corners_with_shot=corners_with_shot,
                 xg=sum(float(row["xg"]) for row in group),
-                shot_rate=shots / count if count else 0.0,
+                shot_rate=corners_with_shot / count if count else 0.0,
                 evidence_ids=tuple(str(row["evidence_id"]) for row in group[:5]),
                 publish=publish,
                 reliability="descriptive" if publish else "suppressed: fewer than 4 corners",
@@ -135,9 +139,11 @@ def _corner_sequence(corner: Event, events: list[Event], position: int) -> list[
     return sequence
 
 
-def _target_zone(corner: Event, side: str, is_short: bool) -> str:
-    if is_short:
+def _target_zone(corner: Event, side: str, delivery_type: str) -> str:
+    if delivery_type == "short":
         return "short option"
+    if delivery_type == "unknown":
+        return "unknown"
     if corner.end_y is None:
         return "unknown"
     if 32 <= corner.end_y <= 48:

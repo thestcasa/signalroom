@@ -18,7 +18,7 @@ SignalRoom currently consumes competitions, matches, and events. Lineups and 360
 
 Required: event ID, match ID, index, period, timestamp, team, event type, possession, possession team, and play pattern.
 
-Nullable: player, start location, end location, outcome, subtype, and xG. Missing optional fields suppress affected metrics or records rather than receiving fabricated values.
+Nullable: player, start location, end location, outcome, subtype, pass length, and xG. Validation reports missing movement end locations, shot xG, and corner length explicitly. Missing corner length produces an `unknown` routine type rather than an inferred short/direct label.
 
 ## Verified availability
 
@@ -33,4 +33,3 @@ Nullable: player, start location, end location, outcome, subtype, and xG. Missin
 - Coordinates and event labels are provider-specific before adapter normalization.
 - Open-data availability is a selected sample, not a complete current competition feed.
 - The public data agreement controls use of source data and requires attribution.
-

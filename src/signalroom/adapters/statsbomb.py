@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -29,7 +30,10 @@ class StatsBombOpenDataAdapter:
     def _get_json(self, relative_path: str) -> Any:
         target = self.cache_dir / relative_path
         if target.exists():
-            return json.loads(target.read_text(encoding="utf-8"))
+            try:
+                return json.loads(target.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                target.unlink(missing_ok=True)
         target.parent.mkdir(parents=True, exist_ok=True)
         url = f"{BASE_URL}/{relative_path}"
         last_error: Exception | None = None
@@ -38,7 +42,9 @@ class StatsBombOpenDataAdapter:
                 response = self.session.get(url, timeout=90)
                 response.raise_for_status()
                 payload = response.json()
-                target.write_text(json.dumps(payload), encoding="utf-8")
+                temporary = target.with_suffix(f"{target.suffix}.{os.getpid()}.tmp")
+                temporary.write_text(json.dumps(payload), encoding="utf-8")
+                temporary.replace(target)
                 return payload
             except (requests.RequestException, ValueError) as exc:
                 last_error = exc

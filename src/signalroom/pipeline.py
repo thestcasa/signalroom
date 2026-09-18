@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import shutil
 from dataclasses import replace
-from datetime import UTC, datetime
 from pathlib import Path
 
 from .adapters.statsbomb import (
@@ -78,8 +77,7 @@ def build_case(
     routine_dicts = [routine.to_dict() for routine in routines]
     published_routines = [row for row in routine_dicts if row["publish"]]
     bundle: dict[str, object] = {
-        "schema_version": "1.0.0",
-        "generated_at": datetime.now(UTC).replace(microsecond=0).isoformat(),
+        "schema_version": "1.1.0",
         "case": {
             "slug": config.slug,
             "team": config.team,
@@ -106,12 +104,15 @@ def build_case(
         },
         "method": {
             "metric_version": METRIC_VERSION,
+            "set_piece_version": "1.1.0",
             "baseline_matches": config.baseline_matches,
             "recent_matches": config.recent_matches,
             "minimum_evidence_sequences": config.minimum_evidence_sequences,
             "bootstrap_samples": config.bootstrap_samples,
             "multiple_comparison_control": "Benjamini-Hochberg",
             "selection_rule": "|Hedges g| >= 0.5, bootstrap direction >= 0.80, sensitivity >= 2/3, plus q <= 0.20 or stronger effect/stability",
+            "short_corner_definition": "first delivery length <= 15 StatsBomb pitch units",
+            "shot_rate_definition": "share of corner sequences containing at least one team shot",
         },
         "product_path": "Narrow SignalRoom MVP with SetPieceLab as the most complete module",
         "findings": findings,
@@ -132,7 +133,12 @@ def build_case(
     metric_comparison_chart(final_comparisons, assets / "metric_comparison.png")
     corner_map(corner_sequences, assets / "corner_map.png", config.team)
     routine_share_chart(routine_dicts, assets / "routine_shares.png")
-    strongest = max(final_comparisons, key=lambda item: abs(item.standardized_effect))
+    strongest = max(
+        final_comparisons,
+        key=lambda item: abs(item.standardized_effect)
+        if item.standardized_effect is not None
+        else 0.0,
+    )
     trend_chart(
         metrics,
         strongest.metric,

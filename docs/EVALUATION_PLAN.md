@@ -13,14 +13,19 @@
 - Evidence IDs resolve to ingested source events
 - Generated narratives exactly match structured values
 - Configuration portability across two competitions
+- Corrupt cache recovery and atomic cache writes
+- Deterministic end-to-end pipeline build with synthetic fixtures
+- Short/direct corner classification and sequence-level shot conversion
+- Zero-variance statistical suppression without non-standard JSON values
 
 ## Real-data acceptance
 
 Both checked-in configurations must build from an empty cache. The interactive interface must load both derived bundles. The static report and screenshots must display the same values as `bundle.json`.
+
+GitHub Actions runs the locked environment setup, linter, and test suite for pushes and pull requests. Real-data regeneration remains a deliberate local acceptance check because it downloads the pinned provider snapshot.
 
 ## Statistical interpretation
 
 Intervals quantify match-to-match sampling variability within the selected historical schedule. They do not account for every confounder, including opponent strength, score state, injuries, coaching changes, or selection. The system identifies analyst review candidates, not causal tactical effects or predictive sporting value.
 
 References: Benjamini and Hochberg (1995), DOI `10.1111/j.2517-6161.1995.tb02031.x`; Wilson (1927), DOI `10.1080/01621459.1927.10502953`; Hedges (1981), DOI `10.3102/10769986006002107`.
-

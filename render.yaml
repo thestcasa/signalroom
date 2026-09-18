@@ -4,8 +4,8 @@ services:
     name: signalroom
     runtime: python
     plan: free
-    buildCommand: pip install .
-    startCommand: streamlit run app.py --server.address 0.0.0.0 --server.port $PORT --server.headless true
+    buildCommand: pip install uv==0.12.15 && uv sync --frozen --no-dev
+    startCommand: .venv/bin/streamlit run app.py --server.address 0.0.0.0 --server.port $PORT --server.headless true
     healthCheckPath: /_stcore/health
     autoDeployTrigger: commit
     envVars:

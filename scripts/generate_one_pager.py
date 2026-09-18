@@ -18,8 +18,8 @@ from reportlab.platypus import Paragraph
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "outreach" / "SignalRoom_Case_Study.pdf"
 INK = colors.HexColor("#102A43")
-TEAL = colors.HexColor("#00A6A6")
-CORAL = colors.HexColor("#FF6B5E")
+TEAL = colors.HexColor("#007C7C")
+CORAL = colors.HexColor("#B9473D")
 PAPER = colors.HexColor("#F7F5EF")
 MIST = colors.HexColor("#E8F1F5")
 MUTED = colors.HexColor("#587287")
@@ -133,8 +133,9 @@ def main() -> None:
     canvas.setFont(BOLD, 7.2)
     canvas.setFillColor(MUTED)
     canvas.drawString(left_x, y, "ROUTINE")
-    canvas.drawRightString(left_x + 57 * mm, y, "N")
-    canvas.drawRightString(left_x + 70 * mm, y, "SHOTS")
+    canvas.drawRightString(left_x + 50 * mm, y, "N")
+    canvas.drawRightString(left_x + 62 * mm, y, "C")
+    canvas.drawRightString(left_x + 72 * mm, y, "S")
     canvas.drawRightString(left_x + 82 * mm, y, "xG")
     y -= 3 * mm
     canvas.setStrokeColor(colors.HexColor("#CFDCE2"))
@@ -145,13 +146,14 @@ def main() -> None:
         canvas.setFont(FONT, 7.2)
         name = routine["routine"].replace("central goalmouth", "central")
         canvas.drawString(left_x, y, name[:42])
-        canvas.drawRightString(left_x + 57 * mm, y, str(routine["count"]))
-        canvas.drawRightString(left_x + 70 * mm, y, str(routine["shots"]))
+        canvas.drawRightString(left_x + 50 * mm, y, str(routine["count"]))
+        canvas.drawRightString(left_x + 62 * mm, y, str(routine["corners_with_shot"]))
+        canvas.drawRightString(left_x + 72 * mm, y, str(routine["shots"]))
         canvas.drawRightString(left_x + 82 * mm, y, f"{routine['xg']:.2f}")
     y -= 9 * mm
     paragraph(
         canvas,
-        "Each routine links to match ID, event IDs, players, coordinates, ordered actions, and the source corner. Clusters with fewer than four examples are not published.",
+        "C = corners producing a shot; S = total shots. Each routine links to match ID, event IDs, players, coordinates, ordered actions, and the source corner. Clusters with fewer than four examples are not published.",
         left_x,
         y,
         left_w,

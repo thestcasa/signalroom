@@ -13,30 +13,54 @@ from .models import EvidenceSequence
 from .statistics import MetricComparison
 
 INK = "#102A43"
-TEAL = "#00A6A6"
-CORAL = "#FF6B5E"
+TEAL = "#007C7C"
+CORAL = "#B9473D"
 MIST = "#E8F1F5"
 PAPER = "#F7F5EF"
 
 
 def metric_comparison_chart(comparisons: list[MetricComparison], output: Path) -> None:
     published = [item for item in comparisons if item.publish]
+    valid = [item for item in comparisons if item.standardized_effect is not None]
     displayed = (
         published
-        or sorted(comparisons, key=lambda item: abs(item.standardized_effect), reverse=True)[:3]
+        or sorted(valid, key=lambda item: abs(item.standardized_effect or 0.0), reverse=True)[:3]
     )
     labels = [item.label for item in displayed]
-    baseline = [item.baseline_value for item in displayed]
-    recent = [item.recent_value for item in displayed]
+    effects = [float(item.standardized_effect or 0.0) for item in displayed]
     y = np.arange(len(labels))
     fig, ax = plt.subplots(figsize=(9.5, max(3.2, len(labels) * 1.2)), facecolor=PAPER)
     ax.set_facecolor(PAPER)
-    ax.barh(y + 0.18, baseline, height=0.32, color="#A9BAC6", label="Baseline")
-    ax.barh(y - 0.18, recent, height=0.32, color=TEAL, label="Recent")
+    colors = [TEAL if value >= 0 else CORAL for value in effects]
+    ax.barh(y, effects, height=0.46, color=colors)
     ax.set_yticks(y, labels)
     ax.invert_yaxis()
-    ax.set_title("Window comparison", loc="left", color=INK, fontsize=16, weight="bold")
-    ax.legend(frameon=False, ncol=2, loc="lower right")
+    ax.axvline(0, color=INK, linewidth=0.9)
+    ax.set_xlabel("Hedges g (recent window relative to baseline)")
+    title = "Published standardized changes" if published else "Strongest descriptive changes"
+    ax.set_title(title, loc="left", color=INK, fontsize=16, weight="bold")
+    if not published:
+        ax.text(
+            0,
+            1.01,
+            "None passed every publication gate",
+            transform=ax.transAxes,
+            color="#587287",
+            fontsize=9,
+        )
+    for index, item in enumerate(displayed):
+        value = effects[index]
+        detail = f"{item.baseline_value:.2f} → {item.recent_value:.2f} {item.unit}"
+        ax.annotate(
+            detail,
+            xy=(value, index),
+            xytext=(6 if value >= 0 else -6, 0),
+            textcoords="offset points",
+            va="center",
+            ha="left" if value >= 0 else "right",
+            fontsize=8,
+            color=INK,
+        )
     ax.grid(axis="x", alpha=0.18)
     for spine in ax.spines.values():
         spine.set_visible(False)

@@ -29,6 +29,7 @@ def make_event(
     outcome: str | None = None,
     subtype: str | None = None,
     xg: float | None = None,
+    pass_length: float | None = 30.0,
     timestamp: str = "00:01:00.000",
 ) -> Event:
     raw = {
@@ -45,7 +46,7 @@ def make_event(
         "play_pattern": {"name": "Regular Play"},
     }
     if event_type == "Pass":
-        raw["pass"] = {"end_location": [end_x, end_y]}
+        raw["pass"] = {"end_location": [end_x, end_y], "length": pass_length}
         if subtype:
             raw["pass"]["type"] = {"name": subtype}
     return Event(

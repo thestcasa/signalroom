@@ -2,6 +2,8 @@
 
 SignalRoom converts football event data into short, evidence-linked historical briefings. It is a club-independent applied analytics case study by Alessandro Casadei.
 
+**Live demo:** https://signalroom-tka1.onrender.com
+
 The MVP deliberately takes a narrow path: cautious match-window change detection plus a deeper `SetPieceLab` module for attacking corners. It suppresses weak findings instead of filling a report.
 
 ## What works
@@ -30,7 +32,7 @@ Open the local URL printed by Streamlit. Raw event files are downloaded from the
 
 ## Deployment
 
-`render.yaml` defines a single free-plan Render web service with no secrets or external infrastructure. It binds Streamlit to Render's `PORT` and uses `/_stcore/health` for health checks. Applying the Blueprint requires selecting the intended Render workspace first:
+`render.yaml` is the canonical specification for a single free-plan Render web service with no secrets or external infrastructure. It binds Streamlit to Render's `PORT` and uses `/_stcore/health` for health checks. Existing services created outside a Blueprint must be checked separately for configuration drift. Applying the Blueprint requires selecting the intended Render workspace first:
 
 `https://dashboard.render.com/blueprint/new?repo=https://github.com/thestcasa/signalroom`
 

@@ -20,7 +20,7 @@ class MetricComparison:
     recent_value: float
     absolute_change: float
     relative_change_pct: float | None
-    standardized_effect: float
+    standardized_effect: float | None
     ci_low: float
     ci_high: float
     direction_probability: float
@@ -74,14 +74,20 @@ def compare_windows(frame: pd.DataFrame, config: CaseConfig) -> list[MetricCompa
     for item, q_value in zip(raw, q_values, strict=True):
         metric = item["definition"]
         assert isinstance(metric, MetricDefinition)
-        effect = float(item["effect"])
+        effect = item["effect"]
+        assert effect is None or isinstance(effect, float)
+        effect_magnitude = abs(effect) if effect is not None else 0.0
         direction_probability = float(item["direction_probability"])
         sensitivity = float(item["sensitivity"])
         publish = (
-            abs(effect) >= 0.5
+            effect is not None
+            and effect_magnitude >= 0.5
             and direction_probability >= 0.80
             and sensitivity >= 2 / 3
-            and (q_value <= 0.20 or (abs(effect) >= 0.8 and direction_probability >= 0.90))
+            and (
+                q_value <= 0.20
+                or (effect_magnitude >= 0.8 and direction_probability >= 0.90)
+            )
         )
         if publish and q_value <= 0.10 and direction_probability >= 0.95:
             reliability = "high"
@@ -92,13 +98,19 @@ def compare_windows(frame: pd.DataFrame, config: CaseConfig) -> list[MetricCompa
         reason = None
         if not publish:
             failures = []
-            if abs(effect) < 0.5:
+            if effect is None:
+                failures.append("undefined standardized effect due to zero pooled variance")
+            elif effect_magnitude < 0.5:
                 failures.append("negligible standardized effect")
             if direction_probability < 0.80:
                 failures.append("unstable bootstrap direction")
             if sensitivity < 2 / 3:
                 failures.append("window sensitivity")
-            if q_value > 0.20 and not (abs(effect) >= 0.8 and direction_probability >= 0.90):
+            if q_value > 0.20 and not (
+                effect is not None
+                and effect_magnitude >= 0.8
+                and direction_probability >= 0.90
+            ):
                 failures.append("weak multiple-comparison evidence")
             reason = ", ".join(failures)
         results.append(
@@ -136,12 +148,12 @@ def _bootstrap_differences(
     return after - before
 
 
-def _standardized_effect(baseline: np.ndarray, recent: np.ndarray) -> float:
+def _standardized_effect(baseline: np.ndarray, recent: np.ndarray) -> float | None:
     n1, n2 = len(baseline), len(recent)
     pooled_numerator = (n1 - 1) * baseline.var(ddof=1) + (n2 - 1) * recent.var(ddof=1)
     pooled = math.sqrt(pooled_numerator / (n1 + n2 - 2)) if n1 + n2 > 2 else 0.0
     if pooled < 1e-12:
-        return 0.0 if abs(recent.mean() - baseline.mean()) < 1e-12 else math.inf
+        return 0.0 if abs(recent.mean() - baseline.mean()) < 1e-12 else None
     correction = 1 - 3 / (4 * (n1 + n2) - 9)
     return float(correction * (recent.mean() - baseline.mean()) / pooled)
 
@@ -174,7 +186,9 @@ def _sensitivity(frame: pd.DataFrame, metric: MetricDefinition, config: CaseConf
         after = frame.iloc[-recent_n:][metric.key].astype(float).to_numpy()
         effect = _standardized_effect(before, after)
         checks.append(
-            np.sign(after.mean() - before.mean()) == main_direction and abs(effect) >= 0.25
+            effect is not None
+            and np.sign(after.mean() - before.mean()) == main_direction
+            and abs(effect) >= 0.25
         )
     return float(np.mean(checks)) if checks else 0.0
 

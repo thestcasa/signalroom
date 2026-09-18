@@ -17,9 +17,9 @@ SignalRoom compares a recent match window with the immediately preceding, non-ov
 
 Brighton: all seven broad changes were suppressed. Their standardized effects ranged from -0.35 to 0.42, and none cleared the combined magnitude, stability, sensitivity, and multiple-comparison gate. This is not evidence that tactics did not change. It means this design should not promote a broad change from the available sample.
 
-SetPieceLab processed 92 Brighton attacking corners. Four groups met the minimum cluster size: right/direct/central (45, 17 shots, 1.91 xG), left/direct/central (34, 10 shots, 1.54 xG), right/direct/near-side (4, 2 shots, 0.22 xG), and left/short/short-option (4, 1 shot, 0.15 xG). Each output has concrete source sequences.
+SetPieceLab processed 92 Brighton attacking corners. Three groups met the minimum cluster size: right/direct/central (45 corners, 17 shot-producing sequences, 17 total shots, 1.91 xG), left/direct/central (35, 8, 10, 1.54 xG), and right/direct/near-side (6, 3, 3, 0.24 xG). Each output has concrete source sequences. Conversion counts corner sequences with at least one shot, while rebound shots remain visible in the separate total-shot count.
 
-The same pipeline processed Bayer Leverkusen through configuration only: 34 matches, 236 attacking corners, and seven published routine groups. Its broad comparisons were also suppressed after false-discovery control.
+The same pipeline processed Bayer Leverkusen through configuration only: 34 matches, 236 attacking corners, and eight published routine groups. Its broad comparisons were also suppressed after false-discovery control.
 
 ## Interpretation
 

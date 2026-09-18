@@ -26,3 +26,31 @@ def test_small_routine_is_suppressed(event_factory):
     routines, _ = analyze_attacking_corners([match], events, "Example FC", minimum_cluster=4)
     assert routines[0].publish is False
     assert "fewer than 4" in routines[0].reliability
+
+
+def test_shot_rate_counts_converted_corners_not_rebound_shots(event_factory):
+    match = Match(1, "2024-01-01", "Example FC", "Opponent", "Test", "2024")
+    events = [
+        event_factory("corner", subtype="Corner", pass_length=30),
+        event_factory("shot-1", index=2, event_type="Shot", xg=0.1, timestamp="00:01:03.000"),
+        event_factory("shot-2", index=3, event_type="Shot", xg=0.2, timestamp="00:01:06.000"),
+    ]
+    routines, _ = analyze_attacking_corners([match], events, "Example FC", minimum_cluster=1)
+    assert routines[0].shots == 2
+    assert routines[0].corners_with_shot == 1
+    assert routines[0].shot_rate == 1.0
+
+
+def test_long_delivery_is_not_classified_as_short_from_end_x(event_factory):
+    match = Match(1, "2024-01-01", "Example FC", "Opponent", "Test", "2024")
+    corner = event_factory(
+        "corner",
+        subtype="Corner",
+        x=120,
+        y=0,
+        end_x=105,
+        end_y=37,
+        pass_length=40,
+    )
+    routines, _ = analyze_attacking_corners([match], [corner], "Example FC", minimum_cluster=1)
+    assert routines[0].delivery_type == "direct"
