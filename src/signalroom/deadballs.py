@@ -278,7 +278,7 @@ def _summaries(sequences: list[DeadBallSequence], matches: list[Match], team: st
             recurring_players=[{"player": name, "count": count} for name, count in players.most_common(5)],
             recurring_combinations=[{"players": list(names), "count": count} for names, count in combos.most_common(5)],
             repetition_matches=len(match_ids),
-            evidence_ids=tuple(row.evidence_id for row in rows[:5]),
+            evidence_ids=tuple(row.evidence_id for row in rows[:1]),
             review_questions=_review_questions(restart_type, rows, contacts, players),
             data_quality=quality,
             publication=publication,

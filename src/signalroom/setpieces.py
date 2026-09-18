@@ -112,7 +112,7 @@ def analyze_attacking_corners(
                 corners_with_shot=corners_with_shot,
                 xg=sum(float(row["xg"]) for row in group),
                 shot_rate=corners_with_shot / count if count else 0.0,
-                evidence_ids=tuple(str(row["evidence_id"]) for row in group[:5]),
+                evidence_ids=tuple(str(row["evidence_id"]) for row in group[:1]),
                 publish=publish,
                 reliability="descriptive" if publish else "suppressed: fewer than 4 corners",
             )

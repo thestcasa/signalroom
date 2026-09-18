@@ -117,7 +117,9 @@ with st.sidebar:
     )
     minimum_sample = st.slider("Minimum routine sample", 2, 8, 4)
 
-corner_rows = [row for row in bundle["evidence"] if str(row["evidence_id"]).startswith("SP-")]
+corner_rows = bundle["set_piece_lab"].get("routine_index") or [
+    row for row in bundle["evidence"] if str(row["evidence_id"]).startswith("SP-")
+]
 corner_sequences = [
     EvidenceSequence(
         evidence_id=str(row["evidence_id"]),

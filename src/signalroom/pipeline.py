@@ -48,7 +48,7 @@ def build_case(
     assets = output / "assets"
     assets.mkdir(parents=True, exist_ok=True)
     recent_ids = set(metrics.iloc[-config.recent_matches :]["match_id"].astype(int))
-    evidence = list(corner_sequences) + list(dead_ball_sequences)
+    evidence: list = []
     findings = []
     final_comparisons = []
     for comparison in comparisons:
@@ -76,12 +76,45 @@ def build_case(
             item["evidence_ids"] = [sequence.evidence_id for sequence in sequences]
             item["narrative"] = deterministic_finding_text(item)
             findings.append(item)
+    routine_dicts = [routine.to_dict() for routine in routines]
+    published_routines = [row for row in routine_dicts if row["publish"]]
+    representative_ids = {
+        evidence_id
+        for routine in routine_dicts
+        for evidence_id in routine["evidence_ids"]
+    }
+    representative_ids.update(
+        evidence_id
+        for summary in dead_ball_summaries
+        for evidence_id in summary.evidence_ids
+    )
+    evidence.extend(
+        sequence
+        for sequence in corner_sequences + dead_ball_sequences
+        if sequence.evidence_id in representative_ids
+    )
     unique_evidence = {sequence.evidence_id: sequence for sequence in evidence}
     evidence_errors = validate_evidence_references(unique_evidence.values(), events)
     if evidence_errors:
         raise ValueError("Evidence validation failed: " + "; ".join(evidence_errors))
-    routine_dicts = [routine.to_dict() for routine in routines]
-    published_routines = [row for row in routine_dicts if row["publish"]]
+    routine_index = [
+        {
+            "evidence_id": sequence.evidence_id,
+            "match_id": sequence.match_id,
+            "match_date": sequence.match_date,
+            "opponent": sequence.opponent,
+            "label": sequence.label,
+            "start_minute": sequence.start_minute,
+            "start_event_id": sequence.start_event_id,
+            "source_event_ids": list(sequence.source_event_ids),
+            "events": [{"type": event.get("type"), "xg": event.get("xg")} for event in sequence.events],
+            "quality": sequence.quality,
+        }
+        for sequence in corner_sequences
+    ]
+    evidence_sequence_count = sum(
+        sequence.evidence_id.startswith("DB-") for sequence in unique_evidence.values()
+    )
     bundle: dict[str, object] = {
         "schema_version": "1.2.0",
         "case": {
@@ -138,6 +171,7 @@ def build_case(
             "minimum_cluster": 4,
             "published_routines": published_routines,
             "suppressed_routines": [row for row in routine_dicts if not row["publish"]],
+            "routine_index": routine_index,
             "quality": {
                 "corner_length_complete": sum(bool(row.quality.get("corner_length_available")) for row in corner_sequences) / len(corner_sequences) if corner_sequences else 0.0,
                 "locations_complete": sum(bool(row.quality.get("locations_complete")) for row in corner_sequences) / len(corner_sequences) if corner_sequences else 0.0,
@@ -151,6 +185,8 @@ def build_case(
             "supported_restart_types": ["corner", "wide_free_kick", "indirect_free_kick", "direct_free_kick"],
             "architecture_only_restart_types": ["attacking_throw_in", "goal_kick", "kick_off", "penalty", "defensive_dead_ball"],
             "sequence_count": len(dead_ball_sequences),
+            "evidence_sequence_count": evidence_sequence_count,
+            "evidence_policy": "one deterministic representative sequence referenced by each summary or routine, while category counts use the full selected-team event set",
             "summaries": [summary.to_dict() for summary in dead_ball_summaries],
             "profile_features": team_profile_features(dead_ball_sequences, len(matches)),
             "ml": profile_publication(0, len(dead_ball_sequences), minimum_team_count=5),
