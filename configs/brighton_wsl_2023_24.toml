@@ -11,4 +11,7 @@ minimum_recent_matches = 5
 minimum_evidence_sequences = 3
 bootstrap_samples = 2000
 random_seed = 42
-
+load_complete_population = true
+expected_source_fixtures = 132
+peer_population_eligible = true
+population_scope = "complete-competition-season"

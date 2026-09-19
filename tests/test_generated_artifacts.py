@@ -2,43 +2,39 @@ import json
 from pathlib import Path
 
 from signalroom.reporting import validate_grounded_bundle
+from signalroom.rights import validate_public_payload
 
 CASE_ROOT = Path("artifacts/cases")
 
 
-def test_two_real_case_bundles_are_grounded_and_portable():
+def test_two_real_case_bundles_are_grounded_and_rights_safe():
     bundles = []
     for path in sorted(CASE_ROOT.glob("*/bundle.json")):
-        raw = path.read_text(encoding="utf-8")
-        bundle = json.loads(raw, parse_constant=lambda value: (_ for _ in ()).throw(ValueError(value)))
+        bundle = json.loads(path.read_text(encoding="utf-8"))
         assert validate_grounded_bundle(bundle) == []
-        assert bundle["set_piece_lab"]["corner_count"] > 0
+        assert validate_public_payload(bundle) == []
+        assert bundle["schema_version"] == "2.0.0"
         assert bundle["case"]["historical_only"] is True
-        assert bundle["schema_version"] == "1.2.0"
         assert bundle["capability"]["level"] == "event"
-        assert bundle["dead_ball_lab"]["sequence_count"] > bundle["set_piece_lab"]["corner_count"]
+        assert bundle["set_piece_lab"]["corner_count"] > 0
+        assert bundle["dead_ball_lab"]["sequence_count"] >= bundle["set_piece_lab"]["corner_count"]
         assert {row["restart_type"] for row in bundle["dead_ball_lab"]["summaries"]} == {
             "corner",
-            "wide_free_kick",
-            "indirect_free_kick",
-            "direct_free_kick",
+            "wide_final_third_free_kick_pass",
+            "central_final_third_free_kick_pass",
+            "direct_free_kick_shot",
         }
-        assert bundle["dead_ball_lab"]["ml"]["status"] == "suppressed"
-        assert "generated_at" not in bundle
         assert (path.parent / "report.html").exists()
-        assert (path.parent / "assets" / "statsbomb-open-data-logo.png").exists()
+        assert (path.parent / "manual_review_sample.csv").exists()
         bundles.append(bundle)
     assert len(bundles) == 2
-    assert len({bundle["data"]["competition_id"] for bundle in bundles}) == 2
 
 
-def test_brighton_abstention_and_set_piece_output_are_preserved():
+def test_brighton_has_complete_wsl_peer_population():
     path = CASE_ROOT / "brighton-wsl-2023-24" / "bundle.json"
     bundle = json.loads(path.read_text(encoding="utf-8"))
-    assert bundle["case"]["matches"] == 22
-    assert bundle["set_piece_lab"]["corner_count"] == 92
-    assert bundle["findings"] == []
-    routines = bundle["set_piece_lab"]["published_routines"]
-    assert len(routines) == 3
-    assert [row["count"] for row in routines] == [45, 35, 6]
-    assert all(row["shot_rate"] <= 1 for row in routines)
+    assert bundle["data"]["coverage"]["received_fixtures"] == 132
+    assert bundle["data"]["coverage"]["complete"] is True
+    assert bundle["peer_baseline"]["status"] == "descriptive"
+    assert bundle["peer_baseline"]["teams"] == 12
+    assert bundle["peer_baseline"]["peer_teams"] == 11

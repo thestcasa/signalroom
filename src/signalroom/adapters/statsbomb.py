@@ -4,13 +4,14 @@ import json
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
 import requests
 
 from ..config import CaseConfig
-from ..models import Event, Match
+from ..models import Event, LineupEntry, Match
 
 SOURCE_REVISION = "4b73468fc5b0f1950f9f66fada70ad3a4f9327cb"
 BASE_URL = f"https://raw.githubusercontent.com/hudl/open-data/{SOURCE_REVISION}/data"
@@ -84,6 +85,82 @@ class StatsBombOpenDataAdapter:
         ]
         return matches, events
 
+    def load_population(
+        self, config: CaseConfig
+    ) -> tuple[list[Match], list[Event], list[LineupEntry], dict[str, Any]]:
+        """Load the declared comparison population and reconcile its fixture ledger."""
+        relative_manifest = f"matches/{config.competition_id}/{config.season_id}.json"
+        raw_matches = self._get_json(relative_manifest)
+        selected_raw = (
+            list(raw_matches)
+            if config.load_complete_population
+            else [
+                raw
+                for raw in raw_matches
+                if config.team
+                in (raw["home_team"]["home_team_name"], raw["away_team"]["away_team_name"])
+            ]
+        )
+        selected_raw.sort(key=lambda raw: (raw["match_date"], raw["match_id"]))
+        if not selected_raw:
+            raise ValueError(
+                f"No fixtures found for competition={config.competition_id}, season={config.season_id}"
+            )
+        matches = [self._parse_match(raw, config) for raw in selected_raw]
+        raw_events: dict[int, list[dict[str, Any]]] = {}
+        raw_lineups: dict[int, list[dict[str, Any]]] = {}
+        with ThreadPoolExecutor(max_workers=self.workers) as pool:
+            event_futures = {
+                pool.submit(self._get_json, f"events/{match.match_id}.json"): match.match_id
+                for match in matches
+            }
+            lineup_futures = {
+                pool.submit(self._get_json, f"lineups/{match.match_id}.json"): match.match_id
+                for match in matches
+            }
+            for future in as_completed(event_futures):
+                raw_events[event_futures[future]] = future.result()
+            for future in as_completed(lineup_futures):
+                raw_lineups[lineup_futures[future]] = future.result()
+        events = [
+            self._parse_event(raw, match.match_id)
+            for match in matches
+            for raw in raw_events[match.match_id]
+        ]
+        lineups = [
+            entry
+            for match in matches
+            for entry in self._parse_lineups(raw_lineups[match.match_id], match.match_id)
+        ]
+        expected = config.expected_source_fixtures or len(raw_matches)
+        received_ids = {match.match_id for match in matches}
+        manifest_ids = {int(raw["match_id"]) for raw in selected_raw}
+        missing_ids = sorted(manifest_ids - received_ids)
+        coverage = {
+            "scope": config.population_scope,
+            "expected_fixtures": expected,
+            "source_manifest_fixtures": len(raw_matches),
+            "selected_fixtures": len(matches),
+            "received_fixtures": len(received_ids),
+            "missing_fixture_ids": missing_ids,
+            "complete": len(matches) == expected and not missing_ids,
+            "peer_population_eligible": bool(config.peer_population_eligible),
+            "manifest_sha256": self.cached_sha256(relative_manifest),
+        }
+        if len(matches) != expected:
+            coverage["coverage_explanation"] = (
+                f"Declared scope contains {len(matches)} fixtures; expected {expected}. "
+                "Peer claims are suppressed."
+            )
+            coverage["peer_population_eligible"] = False
+        return matches, events, lineups, coverage
+
+    def cached_sha256(self, relative_path: str) -> str:
+        target = self.cache_dir / relative_path
+        if not target.exists():
+            self._get_json(relative_path)
+        return sha256(target.read_bytes()).hexdigest()
+
     @staticmethod
     def _parse_match(raw: dict[str, Any], config: CaseConfig) -> Match:
         return Match(
@@ -93,13 +170,19 @@ class StatsBombOpenDataAdapter:
             away_team=raw["away_team"]["away_team_name"],
             competition=config.competition_label,
             season=config.season_label,
+            competition_id=config.competition_id,
+            season_id=config.season_id,
+            home_team_id=int(raw["home_team"]["home_team_id"]),
+            away_team_id=int(raw["away_team"]["away_team_id"]),
         )
 
     @staticmethod
     def _parse_event(raw: dict[str, Any], match_id: int) -> Event:
         location = raw.get("location") or [None, None]
-        detail = raw.get("pass") or raw.get("carry") or raw.get("shot") or {}
+        detail = _event_detail(raw)
         end_location = detail.get("end_location") or [None, None]
+        pass_detail = raw.get("pass") or {}
+        shot_detail = raw.get("shot") or {}
         return Event(
             event_id=str(raw["id"]),
             match_id=match_id,
@@ -120,16 +203,79 @@ class StatsBombOpenDataAdapter:
             end_y=_number(end_location, 1),
             outcome=detail.get("outcome", {}).get("name"),
             subtype=detail.get("type", {}).get("name"),
-            xg=(raw.get("shot") or {}).get("statsbomb_xg"),
+            xg=shot_detail.get("statsbomb_xg"),
             raw=raw,
             player_id=(raw.get("player") or {}).get("id"),
             team_id=(raw.get("team") or {}).get("id"),
-            recipient=(raw.get("pass") or {}).get("recipient", {}).get("name"),
-            pass_length=(raw.get("pass") or {}).get("length"),
+            recipient=pass_detail.get("recipient", {}).get("name"),
+            pass_length=pass_detail.get("length"),
+            recipient_id=pass_detail.get("recipient", {}).get("id"),
+            body_part=detail.get("body_part", {}).get("name"),
+            technique=detail.get("technique", {}).get("name"),
+            pass_height=pass_detail.get("height", {}).get("name"),
+            shot_outcome=shot_detail.get("outcome", {}).get("name"),
+            related_event_ids=tuple(str(value) for value in raw.get("related_events", [])),
+            source_payload_ref=f"events/{match_id}.json#{raw['id']}",
         )
+
+    @staticmethod
+    def _parse_lineups(raw: list[dict[str, Any]], match_id: int) -> list[LineupEntry]:
+        output: list[LineupEntry] = []
+        for team in raw:
+            for player in team.get("lineup", []):
+                positions = player.get("positions") or []
+                starts = any(position.get("from") == "00:00" for position in positions)
+                durations = [
+                    _duration_minutes(position.get("from"), position.get("to"))
+                    for position in positions
+                ]
+                valid_durations = [value for value in durations if value is not None]
+                output.append(
+                    LineupEntry(
+                        match_id=match_id,
+                        team=str(team["team_name"]),
+                        team_id=int(team["team_id"]),
+                        player=str(player["player_name"]),
+                        player_id=int(player["player_id"]),
+                        positions=tuple(
+                            str(position.get("position", "unknown")) for position in positions
+                        ),
+                        started=starts,
+                        recorded_minutes=sum(valid_durations) if valid_durations else None,
+                        source_payload_ref=f"lineups/{match_id}.json#player:{player['player_id']}",
+                    )
+                )
+        return output
 
 
 def _number(values: list[Any], index: int) -> float | None:
     if len(values) <= index or values[index] is None:
         return None
     return float(values[index])
+
+
+def _event_detail(raw: dict[str, Any]) -> dict[str, Any]:
+    event_name = str((raw.get("type") or {}).get("name", ""))
+    key = {
+        "Ball Receipt*": "ball_receipt",
+        "Ball Recovery": "ball_recovery",
+        "Dribbled Past": "dribbled_past",
+        "Goal Keeper": "goalkeeper",
+        "50/50": "50_50",
+    }.get(event_name, event_name.lower().replace(" ", "_"))
+    return raw.get(key) or raw.get("pass") or raw.get("carry") or raw.get("shot") or {}
+
+
+def _duration_minutes(start: str | None, end: str | None) -> float | None:
+    if not start or not end:
+        return None
+
+    def seconds(value: str) -> float:
+        parts = value.split(":")
+        if len(parts) == 2:
+            minutes, secs = parts
+            return int(minutes) * 60 + float(secs)
+        hours, minutes, secs = parts
+        return int(hours) * 3600 + int(minutes) * 60 + float(secs)
+
+    return max(0.0, (seconds(end) - seconds(start)) / 60.0)

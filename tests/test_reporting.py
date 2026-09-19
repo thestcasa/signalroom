@@ -1,49 +1,23 @@
-from signalroom.reporting import deterministic_finding_text, validate_grounded_bundle
+from signalroom.reporting import validate_grounded_bundle
 
 
-def test_grounded_report_accepts_exact_structured_narrative():
-    finding = {
-        "metric": "shots",
-        "label": "Shots",
-        "absolute_change": 2.0,
-        "baseline_value": 8.0,
-        "recent_value": 10.0,
-        "unit": "per match",
-        "ci_low": 0.2,
-        "ci_high": 3.8,
-        "reliability": "moderate",
-        "publish": True,
-        "evidence_ids": ["EV-1", "EV-2", "EV-3"],
+def _bundle():
+    return {
+        "schema_version": "2.0.0",
+        "case": {"historical_only": True},
+        "data": {"coverage": {"complete": True}},
+        "peer_baseline": {"status": "suppressed"},
+        "set_piece_lab": {"delivery_groups": []},
+        "dead_ball_lab": {"summaries": []},
+        "evidence": [{"evidence_id": "DB-1", "evidence_status": "available-derived-summary"}],
     }
-    finding["narrative"] = deterministic_finding_text(finding)
-    bundle = {
-        "method": {"minimum_evidence_sequences": 3},
-        "findings": [finding],
-        "evidence": [{"evidence_id": value} for value in finding["evidence_ids"]],
-        "set_piece_lab": {"published_routines": []},
-    }
-    assert validate_grounded_bundle(bundle) == []
 
 
-def test_grounded_report_rejects_changed_number():
-    finding = {
-        "metric": "shots",
-        "label": "Shots",
-        "absolute_change": 2.0,
-        "baseline_value": 8.0,
-        "recent_value": 10.0,
-        "unit": "per match",
-        "ci_low": 0.2,
-        "ci_high": 3.8,
-        "reliability": "moderate",
-        "publish": True,
-        "evidence_ids": ["EV-1", "EV-2", "EV-3"],
-        "narrative": "Shots increased from 8 to 99.",
-    }
-    bundle = {
-        "method": {"minimum_evidence_sequences": 3},
-        "findings": [finding],
-        "evidence": [{"evidence_id": value} for value in finding["evidence_ids"]],
-        "set_piece_lab": {"published_routines": []},
-    }
-    assert any("Narrative mismatch" in error for error in validate_grounded_bundle(bundle))
+def test_grounded_report_accepts_rights_safe_schema():
+    assert validate_grounded_bundle(_bundle()) == []
+
+
+def test_grounded_report_rejects_source_event_ids():
+    bundle = _bundle()
+    bundle["evidence"][0]["source_event_ids"] = ["provider-id"]
+    assert any("source event IDs" in error for error in validate_grounded_bundle(bundle))

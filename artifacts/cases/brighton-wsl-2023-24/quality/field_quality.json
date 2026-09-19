@@ -1,0 +1,24 @@
+{
+  "events": 495189,
+  "lineup_entries": 5102,
+  "recipient": {
+    "observed": 127525,
+    "missing_or_unavailable": 6048
+  },
+  "move_end_location": {
+    "observed": 242045,
+    "missing_or_unavailable": 0
+  },
+  "shot_xg": {
+    "observed": 3529,
+    "missing_or_unavailable": 0
+  },
+  "body_part": {
+    "observed": 128669,
+    "missing_or_unavailable": 8433
+  },
+  "pass_height": {
+    "observed": 133573,
+    "missing_or_unavailable": 0
+  }
+}

@@ -71,6 +71,8 @@ def make_event(
         subtype=subtype,
         xg=xg,
         raw=deepcopy(raw),
+        pass_length=pass_length if event_type == "Pass" else None,
+        shot_outcome=outcome if event_type == "Shot" else None,
     )
 
 

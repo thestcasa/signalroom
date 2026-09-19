@@ -79,7 +79,7 @@ METRICS: tuple[MetricDefinition, ...] = (
         "progressive_actions",
         "Progressive actions",
         "per match",
-        "Completed passes or carries gaining at least 15 metres in x.",
+        "Completed passes or carries gaining at least 15 provider pitch units in x.",
         lambda e: (
             _completed_action(e) and e.x is not None and e.end_x is not None and e.end_x - e.x >= 15
         ),

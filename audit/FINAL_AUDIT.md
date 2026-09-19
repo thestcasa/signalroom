@@ -1,4 +1,6 @@
-# SignalRoom extension adversarial audit
+# SignalRoom extension adversarial audit (superseded)
+
+Current status: see `../AUDIT.md` and `MILESTONE_REGRESSION.md`. This file describes the pre-milestone implementation and is retained only as history.
 
 Audit date: 18 September 2026
 

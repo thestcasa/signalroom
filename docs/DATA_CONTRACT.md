@@ -1,45 +1,40 @@
 # Data contract
 
-## Implemented source
+## Source manifest
 
-StatsBomb Open Data repository snapshot inspected at commit `4b73468fc5b0f1950f9f66fada70ad3a4f9327cb` on 18 September 2026.
+The pinned StatsBomb source manifest records provider, revision, competition scope, expected and received fixtures, modality list, aggregate event-file and lineup-file hashes, licence reference, and publication mode.
 
-The official repository documents:
+## Identity
 
-- `competitions.json`
-- `matches/{competition_id}/{season_id}.json`
-- `events/{match_id}.json`
-- `lineups/{match_id}.json`
-- `three-sixty/{match_id}.json` for selected matches
+Internal `Match`, `Event`, and `LineupEntry` objects retain provider-scoped identifiers. Public artifacts use SignalRoom evidence IDs and do not expose provider event IDs.
 
-SignalRoom currently consumes competitions, matches, and events. Lineups and 360 are inventoried but not required by implemented metrics. The internal contract is provider-neutral beyond the adapter boundary and carries a capability level with every dead-ball sequence.
+## Event fields
 
-## Internal event fields
+The adapter preserves:
 
-Required: event ID, match ID, index, period, timestamp, team, event type, possession, possession team, and play pattern.
+- time, period, team, player, recipient, event type and subtype
+- source and end coordinates
+- body part, technique, pass height, and outcome
+- possession and linked event references
+- shot outcome and xG
+- local source-payload reference
 
-Nullable: player, start location, end location, outcome, subtype, pass length, and xG. Validation reports missing movement end locations, shot xG, and corner length explicitly. Missing corner length produces an `unknown` routine type rather than an inferred short/direct label.
+Nullable values remain nullable. Generated quality reports distinguish observed from missing or unavailable values. Sequence-specific fields also support not-applicable and censored states.
 
-## Dead-ball sequence contract
+## Lineups and exposure
 
-`DeadBallSequence` contains a stable evidence ID, match and opponent context, period and timestamp, restart type, source event IDs, ordered event summaries, participants, delivery metadata, first recorded contact, second-phase summary, shot and xG outcome, data-quality fields, source revision, and capability level. It is implemented for attacking final-third corners, wide free kicks, indirect near-box free kicks, and direct free-kick shots. Free-kick categories are location buckets because the open event contract does not provide a referee-certified direct/indirect flag.
+Lineups are loaded for every declared fixture. Player position intervals, start status, recorded minutes where calculable, and match exposure are retained. Public role tables scope players to the selected team.
 
-Architecture-only domains use the same planned contract: attacking throw-ins, goal kicks, kick-offs, penalties, defensive dead balls, and synchronized video references.
+## Coordinates
 
-## Bundle compatibility
+Both provider-source and selected-team canonical coordinates exist during processing. Opponent events are rotated by `(120 - x, 80 - y)`. Coordinates are validated against a 120 by 80 pitch. Public evidence publishes lanes and status, not exact source coordinates.
 
-Bundles written before schema `1.2.0` remain readable because the UI treats `dead_ball_lab`, `capability`, and `ordered_events` as optional legacy fields. New builds write `1.2.0` and include the dead-ball domain. No raw provider data is migrated into the bundle.
+## Restart and sequence
 
-## Verified availability
+Restart type, recorded action, spatial category, legal-status availability, termination reason, censoring reason, event membership, roles, quality state, and provenance remain separate.
 
-| Case | Competition / season | Matches for team | 360 |
-| --- | --- | ---: | --- |
-| Brighton & Hove Albion WFC | FA WSL 2023/24, IDs 37 / 281 | 22 | Not available |
-| Bayer Leverkusen | Bundesliga 2023/24, IDs 9 / 281 | 34 | Repository metadata indicates availability, not used by MVP |
+Event, lineup, shot freeze frame, 360 snapshot, continuous tracking, video, and human annotation are distinct modalities. Availability of one does not imply another.
 
-## Known source limitations
+## Rights classes
 
-- Event data captures recorded on-ball and selected defensive actions, not complete off-ball shape.
-- Coordinates and event labels are provider-specific before adapter normalization.
-- Open-data availability is a selected sample, not a complete current competition feed.
-- The public data agreement controls use of source data and requires attribution.
+The public build permits attributed derived aggregates and derived sequence summaries. It rejects raw records, source event identifiers, and source event excerpts. Rights validation runs before bundle generation succeeds.

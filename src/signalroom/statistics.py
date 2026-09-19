@@ -79,15 +79,14 @@ def compare_windows(frame: pd.DataFrame, config: CaseConfig) -> list[MetricCompa
         effect_magnitude = abs(effect) if effect is not None else 0.0
         direction_probability = float(item["direction_probability"])
         sensitivity = float(item["sensitivity"])
+        ci_excludes_zero = float(item["ci_low"]) > 0 or float(item["ci_high"]) < 0
         publish = (
             effect is not None
             and effect_magnitude >= 0.5
             and direction_probability >= 0.80
             and sensitivity >= 2 / 3
-            and (
-                q_value <= 0.20
-                or (effect_magnitude >= 0.8 and direction_probability >= 0.90)
-            )
+            and q_value <= 0.20
+            and ci_excludes_zero
         )
         if publish and q_value <= 0.10 and direction_probability >= 0.95:
             reliability = "high"
@@ -106,12 +105,10 @@ def compare_windows(frame: pd.DataFrame, config: CaseConfig) -> list[MetricCompa
                 failures.append("unstable bootstrap direction")
             if sensitivity < 2 / 3:
                 failures.append("window sensitivity")
-            if q_value > 0.20 and not (
-                effect is not None
-                and effect_magnitude >= 0.8
-                and direction_probability >= 0.90
-            ):
+            if q_value > 0.20:
                 failures.append("weak multiple-comparison evidence")
+            if not ci_excludes_zero:
+                failures.append("match-resampled interval includes zero")
             reason = ", ".join(failures)
         results.append(
             MetricComparison(

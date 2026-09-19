@@ -1,50 +1,62 @@
 # Analytics specification
 
-Metric version: `1.0.0`. StatsBomb pitch coordinates are 120 by 80 and oriented in the attacking direction for each team.
+## Population and context
 
-| Metric | Exact rule |
+Every output declares team, competition, season, historical cutoff, recent matches, preceding reference matches, fixture coverage, modalities, and source revision. The shortlist, evidence review, and export use the same context.
+
+The Brighton case loads all 132 FA Women's Super League 2023/24 fixtures. The Leverkusen case loads the 34 released Leverkusen fixtures and suppresses Bundesliga peer claims.
+
+## Restart taxonomy
+
+| Category | Exact recorded rule |
 | --- | --- |
-| Shots | Count team `Shot` events, including penalties |
-| Expected goals | Sum `shot.statsbomb_xg` |
-| Final-third entries | Completed pass or carry crossing from x < 80 to x >= 80 |
-| Box entries | Completed pass or carry entering x >= 102 and 18 <= y <= 62 from outside |
-| Progressive actions | Completed pass or carry gaining at least 15 x units |
-| Build-up exits | Completed pass or carry starting at x <= 40 and ending at x >= 60 |
-| High regains | `Ball Recovery` or `Interception` recorded at x >= 80 |
+| `corner` | Selected-team pass subtype `Corner` |
+| `wide_final_third_free_kick_pass` | Selected-team pass subtype `Free Kick`, x >= 80, y <= 18 or y >= 62 |
+| `central_final_third_free_kick_pass` | Selected-team pass subtype `Free Kick`, x >= 80, not wide |
+| `direct_free_kick_shot` | Selected-team shot subtype `Free Kick`, x >= 80 |
 
-An absent pass outcome means complete, consistent with the source schema. Carries are treated as complete recorded actions.
+The pass categories do not assert referee-certified direct or indirect status.
 
-## Change gate
+## Sequence boundary
 
-- Baseline and recent windows are chronological and non-overlapping.
-- Resampling unit: match.
-- Publish when absolute bias-corrected standardized effect is at least 0.5, bootstrap direction probability is at least 0.80, and at least two of three recent-window sensitivity checks agree.
-- In addition, require Benjamini-Hochberg q <= 0.20, or a standardized effect of at least 0.8 with direction probability at least 0.90.
-- Require at least three retrievable recent evidence sequences.
+A sequence starts at the restart anchor and remains in the same period and provider possession for at most 20 seconds and 17 later events. It terminates as `shot`, `loss`, `reset`, `stoppage`, or `source_end`. A time or event limit is explicitly censored.
 
-## Attacking final-third dead-ball domain
+The first recorded event after the delivery is reported with its type, team role, body part, outcome, and availability. It is not called physical first contact. There is no football second-phase label.
 
-The supported domain starts with a recorded attacking restart in the final third and retains the same-period, same-possession sequence for at most 20 seconds and 17 subsequent events. Current categories are:
+## Coordinates and delivery groups
 
-- `corner`: pass subtype `Corner`.
-- `wide_free_kick`: pass subtype `Free Kick`, x >= 80, and y <= 18 or y >= 62.
-- `indirect_free_kick`: pass subtype `Free Kick`, x >= 80, and not wide by the location rule.
-- `direct_free_kick`: shot subtype `Free Kick`, x >= 80.
+StatsBomb source coordinates are stored only in the ignored cache. Internal event summaries transform opponent actions into a selected-team-attacks-right frame. Public evidence exposes validated lanes rather than exact coordinates.
 
-The free-kick split is an event-location bucket, not a referee-certified direct/indirect classification. The category summary reports count, rate per match, share with Wilson interval, first-contact zone, delivery target, second-phase rate, shots, xG, xG per restart, recurring players and combinations, repetition across matches, data completeness, suppression reasons, and evidence IDs.
+Corner delivery groups combine:
 
-First contact means the first recorded `Ball Receipt*`, `Duel`, `Clearance`, `Interception`, or `Shot` event after the restart. Second phase means later same-team pass, carry, or shot events after that contact. These are observable event definitions, not visual claims about aerial contact or tactical intent.
+- delivery side
+- short, direct, or unknown pass length
+- two-dimensional target lane
 
-## SetPieceLab v1
+These are algorithmic groups, not analyst-confirmed routines.
 
-An attacking corner begins with a team pass whose subtype is `Corner`. The sequence continues within the same period and possession for at most 20 seconds and 17 subsequent events. Routines are grouped by delivery side, short/direct choice, and target zone. A cluster needs at least four corners. Shares receive 95% Wilson intervals. Output is descriptive, not causal.
+## Change comparison
 
-A short corner has a first-delivery length of at most 15 StatsBomb pitch units. Longer deliveries are direct. If length is unavailable, delivery type and target zone are `unknown`; no coordinate proxy is used. `shot_rate` is sequence conversion: the share of corners followed by at least one team shot inside the sequence window. `shots` remains the total shot count, so rebounds do not inflate conversion.
+Recent and preceding shares use all corners in each window as denominators. Uncertainty resamples complete matches. A change is review-eligible only when all gates pass:
 
-If pooled match variance is zero while window means differ, Hedges g is undefined. SignalRoom serializes the effect as `null` and suppresses the comparison rather than emitting a non-standard JSON infinity or treating it as decisive evidence.
+- minimum recent group sample
+- at least two supporting recent matches
+- at least a five percentage-point difference
+- 95% match-block interval excluding zero
+- consistent material direction across nearby windows
+- at least three retrievable examples
+- at least 90% delivery-group completeness
 
-## Opponent-preparation comparison
+Rows failing a gate remain descriptive and show the exact suppression reasons.
 
-The current source bundle supports a selected-team recent window versus the selected team's previous chronological window. Routine shares use all attacking corners in each window as denominators. The comparison reports percentage-point difference, relative difference only when the baseline share is non-zero, and a deterministic binomial bootstrap interval. Routine-level publication requires a minimum recent sample and at least 90% completeness for the corner delivery-length field. Shot xG is independently suppressed when any supporting shot lacks xG. Stability is recomputed for nearby recent-window sizes and is labelled for analysts rather than presented as a binary truth claim.
+## Outcomes
 
-The dead-ball summary uses within-team repetition and recent-window context. A peer prevalence baseline is intentionally absent when the bundle does not load complete comparable teams. No ML cluster or anomaly is promoted to the main briefing without a reproducible peer matrix, interpretable features, stability checks, and sequence evidence; current cases therefore show a suppressed exploratory profile.
+Pass restarts may report the share of sequences producing a shot within the declared window. Direct free-kick shots do not report shot-producing conversion because the category is selected by the presence of a shot. xG is provider shot xG within the bounded sequence and is descriptive, not causal effectiveness.
+
+## Peer context
+
+The WSL peer view is a complete competition-season descriptive baseline with 11 leave-target-out peers. It reports exposure, corner rate, shot-producing rate, delivery-group shares, and percentiles. It does not support clustering, archetypes, causal claims, or cross-competition generalization.
+
+## Broad metrics
+
+Seven older team metrics remain optional descriptive context in generated bundles. They are not the core preparation workflow. Progressive actions are expressed in provider pitch units, not metres.

@@ -3,6 +3,9 @@ from __future__ import annotations
 import json
 from html import escape
 from pathlib import Path
+from typing import Any
+
+from .evidence import validate_bundle_evidence
 
 
 def deterministic_finding_text(finding: dict[str, object]) -> str:
@@ -16,110 +19,105 @@ def deterministic_finding_text(finding: dict[str, object]) -> str:
     )
 
 
-def validate_grounded_bundle(bundle: dict[str, object]) -> list[str]:
-    errors: list[str] = []
-    evidence = {row["evidence_id"] for row in bundle["evidence"]}
-    for finding in bundle["findings"]:
-        if not finding["publish"]:
-            errors.append(f"Suppressed metric leaked into findings: {finding['metric']}")
-        if len(finding["evidence_ids"]) < bundle["method"]["minimum_evidence_sequences"]:
-            errors.append(f"Insufficient evidence for {finding['metric']}")
-        missing = set(finding["evidence_ids"]) - evidence
-        if missing:
-            errors.append(f"Missing evidence references for {finding['metric']}: {sorted(missing)}")
-        expected = deterministic_finding_text(finding)
-        if finding["narrative"] != expected:
-            errors.append(f"Narrative mismatch for {finding['metric']}")
-    for routine in bundle["set_piece_lab"]["published_routines"]:
-        missing = set(routine["evidence_ids"]) - evidence
-        if missing:
-            errors.append(f"Missing routine evidence: {sorted(missing)}")
-    for summary in bundle.get("dead_ball_lab", {}).get("summaries", []):
-        missing = set(summary.get("evidence_ids", [])) - evidence
-        if missing:
-            errors.append(f"Missing dead-ball evidence: {sorted(missing)}")
-        if summary.get("publication") == "published descriptive" and not summary.get("evidence_ids"):
-            errors.append(f"Published dead-ball category has no evidence: {summary.get('restart_type')}")
+def validate_grounded_bundle(bundle: dict[str, Any]) -> list[str]:
+    errors = validate_bundle_evidence(bundle)
+    if bundle.get("schema_version") != "2.0.0":
+        errors.append("Expected schema version 2.0.0")
+    if not bundle.get("case", {}).get("historical_only"):
+        errors.append("Case must remain explicitly historical")
+    coverage = bundle.get("data", {}).get("coverage", {})
+    peer = bundle.get("peer_baseline", {})
+    if peer.get("status") == "descriptive" and not coverage.get("complete"):
+        errors.append("Peer baseline published from incomplete fixture coverage")
+    evidence_ids = [str(row["evidence_id"]) for row in bundle.get("evidence", [])]
+    if len(evidence_ids) != len(set(evidence_ids)):
+        errors.append("Duplicate public evidence IDs")
+    if any("source_event_ids" in row for row in bundle.get("evidence", [])):
+        errors.append("Public evidence must not include source event IDs")
     return errors
 
 
-def write_html_report(bundle: dict[str, object], output: Path) -> None:
-    findings = bundle["findings"]
-    if findings:
-        finding_cards = "".join(
-            f"""<article class="card"><div class="eyebrow">{escape(str(row["reliability"]))} reliability</div>
-            <h3>{escape(str(row["label"]))}</h3><p>{escape(str(row["narrative"]))}</p>
-            <p class="evidence">Evidence: {", ".join(escape(str(value)) for value in row["evidence_ids"])}</p></article>"""
-            for row in findings
-        )
-    else:
-        finding_cards = "<article class='card'><h3>No broad changes passed the gate</h3><p>The system suppressed every tested metric. Review the descriptive diagnostics, but do not publish a tactical-change claim.</p></article>"
-    routines = "".join(
-        f"<tr><td>{escape(str(row['routine']))}</td><td>{row['count']}</td><td>{float(row['share']) * 100:.1f}%</td><td>{row['corners_with_shot']}</td><td>{float(row['shot_rate']) * 100:.1f}%</td><td>{row['shots']}</td><td>{float(row['xg']):.2f}</td></tr>"
-        for row in bundle["set_piece_lab"]["published_routines"][:6]
+def write_html_report(bundle: dict[str, Any], output: Path) -> None:
+    groups = bundle["set_piece_lab"]["delivery_groups"][:8]
+    rows = "".join(
+        "<tr>"
+        f"<td>{escape(str(row['delivery_group']))}</td>"
+        f"<td>{int(row['count'])}</td>"
+        f"<td>{int(row['matches'])}</td>"
+        f"<td>{float(row['share']) * 100:.1f}%</td>"
+        f"<td>{int(row['corners_with_shot'])}</td>"
+        "</tr>"
+        for row in groups
+    )
+    peer = bundle.get("peer_baseline", {})
+    peer_text = (
+        f"Complete {int(peer['teams'])}-team competition population, with "
+        f"{int(peer['peer_teams'])} leave-target-out peers."
+        if peer.get("status") == "descriptive"
+        else f"Peer comparison suppressed: {escape(str(peer.get('reason', 'unavailable')))}."
     )
     html = f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>SignalRoom | {escape(str(bundle["case"]["team"]))}</title><style>{_css()}</style></head>
-    <body><header><div class="brand">SIGNAL<span>ROOM</span></div><div class="tag">Evidence-linked football intelligence</div></header>
-    <main><section class="hero"><div><div class="eyebrow">Historical case study · {escape(str(bundle["case"]["season"]))}</div>
-    <h1>{escape(str(bundle["case"]["team"]))}</h1><p class="lede">An evidence-first review of repeated and changing attacking final-third dead-ball behaviours.</p></div>
-    <div class="stat"><b>{bundle["case"]["matches"]}</b><span>matches</span><b>{bundle.get("dead_ball_lab", {}).get("sequence_count", 0)}</b><span>dead balls</span></div></section>
-    <section><div class="section-head"><div><div class="eyebrow">SignalRoom</div><h2>Changes worth analyst attention</h2></div><p>Baseline: {bundle["method"]["baseline_matches"]} matches · Recent: {bundle["method"]["recent_matches"]} matches</p></div>
-    <div class="grid">{finding_cards}</div><img class="wide" src="assets/metric_comparison.png" alt="Metric comparison"></section>
-    <section><div class="section-head"><div><div class="eyebrow">Dead-ball Lab</div><h2>Attacking final-third dead balls</h2></div><p>Event-only descriptive categories with evidence IDs.</p></div>
-    <p>Supported categories: corner, wide free kick, indirect free kick near the box, and direct free kick. Free-kick labels are location buckets, not referee-certified direct/indirect status. Video is not available in this data package.</p></section>
-    <section><div class="section-head"><div><div class="eyebrow">SetPieceLab</div><h2>Attacking corner routines</h2></div><p>Clusters below require at least four examples.</p></div>
-    <div class="split"><img src="assets/corner_map.png" alt="Corner delivery map"><img src="assets/routine_shares.png" alt="Routine shares"></div>
-    <table><thead><tr><th>Routine</th><th>n</th><th>Share</th><th>Corners with shot</th><th>Conversion</th><th>Total shots</th><th>xG</th></tr></thead><tbody>{routines}</tbody></table></section>
-    <section class="method"><div><div class="eyebrow">Method guardrails</div><h2>Built to abstain</h2></div><ul><li>Match-level bootstrap intervals and window sensitivity checks</li><li>Benjamini-Hochberg correction across tested metrics</li><li>Minimum sample and evidence-sequence gates</li><li>Every published claim links to source event IDs</li></ul></section>
-    <footer><img src="assets/statsbomb-open-data-logo.png" alt="StatsBomb" class="source-logo"><br><b>Historical analysis, not current tactical advice.</b> Data: StatsBomb Open Data. No club affiliation or endorsement is claimed. Source revision {escape(str(bundle["data"]["source_revision"]))}.</footer>
-    </main></body></html>"""
+<title>SignalRoom | {escape(str(bundle["case"]["team"]))}</title><style>{_css()}</style></head>
+<body><header><div class="brand">SIGNAL<span>ROOM</span></div><div>Historical set-piece evidence workbench</div></header>
+<main><section class="hero"><div class="eyebrow">Historical case · cutoff {escape(str(bundle["case"]["historical_cutoff"]))}</div>
+<h1>{escape(str(bundle["case"]["team"]))}</h1><p>{escape(str(bundle["positioning"]))}</p>
+<div class="stats"><b>{bundle["case"]["matches"]}</b><span>target matches</span><b>{bundle["dead_ball_lab"]["sequence_count"]}</b><span>recorded dead balls</span></div></section>
+<section><div class="eyebrow">Coverage</div><h2>Declared population</h2><p>{peer_text}</p><p>Public output contains attributed aggregates and derived evidence summaries. Raw provider records and source event IDs are not redistributed.</p></section>
+<section><div class="eyebrow">Recorded corners</div><h2>Delivery groups</h2><table><thead><tr><th>Group</th><th>n</th><th>Matches</th><th>Share</th><th>Shot-producing</th></tr></thead><tbody>{rows}</tbody></table></section>
+<section><div class="eyebrow">Evidence</div><h2>{len(bundle["evidence"])} resolvable derived summaries</h2><p>Each displayed reference resolves to a rights-safe evidence card with match context, recorded player roles, outcome, termination, quality state and provenance.</p></section>
+<section class="limits"><h2>What this does not establish</h2><ul>{"".join(f"<li>{escape(str(item))}</li>" for item in bundle["data"]["limitations"])}</ul></section>
+<footer><img src="assets/statsbomb-open-data-logo.png" alt="StatsBomb Open Data"><p>Data: StatsBomb Open Data. Historical analysis only. No club or provider endorsement is claimed. Source revision {escape(str(bundle["data"]["source_revision"]))}.</p></footer>
+</main></body></html>"""
     output.write_text(html, encoding="utf-8")
+
+
+def preparation_brief_html(
+    bundle: dict[str, Any],
+    comparisons: list[dict[str, Any]],
+    baseline_label: str,
+    recent_matches: int,
+    baseline_matches: int,
+    analyst_notes: str = "",
+) -> str:
+    eligible = [row for row in comparisons if row.get("review_eligible")][:5]
+    if eligible:
+        observations = "".join(
+            f"<article><h3>{escape(str(row['delivery_group']))}</h3>"
+            f"<p>{int(row['recent_count'])}/{int(row['recent_total'])} recent versus "
+            f"{int(row['reference_count'])}/{int(row['reference_total'])} reference. "
+            f"Difference {float(row['share_difference']) * 100:+.1f} pp, match-block 95% interval "
+            f"[{float(row['ci_low']) * 100:.1f}, {float(row['ci_high']) * 100:.1f}] pp. "
+            f"Match support {int(row['recent_match_support'])} recent and "
+            f"{int(row['reference_match_support'])} reference.</p>"
+            f"<p>Derived evidence: {escape(', '.join(str(value) for value in row['evidence_ids']))}</p></article>"
+            for row in eligible
+        )
+    else:
+        observations = (
+            "<p><strong>No delivery-group difference passed every review gate.</strong> "
+            "The descriptive distribution remains available without a change claim.</p>"
+        )
+    notes = escape(analyst_notes.strip()) if analyst_notes.strip() else "No analyst notes recorded."
+    limitations = "".join(f"<li>{escape(str(item))}</li>" for item in bundle["data"]["limitations"])
+    return f"""<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
+<title>SignalRoom briefing | {escape(str(bundle["case"]["team"]))}</title><style>{_brief_css()}</style></head>
+<body><div class='eyebrow'>SignalRoom · historical recorded set pieces</div><h1>{escape(str(bundle["case"]["team"]))}</h1>
+<p class='meta'>{escape(str(bundle["case"]["competition"]))} · {escape(str(bundle["case"]["season"]))} · cutoff {escape(str(bundle["case"]["historical_cutoff"]))} · {escape(baseline_label)} · recent {recent_matches} versus preceding {baseline_matches} matches</p>
+<h2>Review shortlist</h2>{observations}<h2>Analyst notes</h2><p>{notes}</p>
+<h2>Definitions</h2><p>Groups describe recorded corner delivery side, pass length category and target lane. They do not establish a routine, tactical intent, danger or causality. Uncertainty resamples complete matches.</p>
+<h2>Limitations</h2><ul>{limitations}</ul>
+<footer>Data: StatsBomb Open Data. Public output contains derived analysis, not raw provider records or source event IDs. Historical case, no club or provider endorsement, and no external analyst validation.</footer></body></html>"""
+
+
+def dump_bundle(bundle: dict[str, Any], output: Path) -> None:
+    output.write_text(json.dumps(bundle, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 def _css() -> str:
     return """
-    :root{--ink:#102a43;--teal:#007c7c;--coral:#b9473d;--paper:#f7f5ef;--mist:#e8f1f5}*{box-sizing:border-box}
-    body{margin:0;background:var(--paper);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,sans-serif}header{display:flex;justify-content:space-between;padding:22px 5vw;border-bottom:1px solid #cdd9df}.brand{font-weight:900;letter-spacing:.08em}.brand span{color:var(--teal)}.tag{font-size:13px;color:#547086}main{max-width:1180px;margin:auto;padding:0 28px}.hero{min-height:350px;display:flex;align-items:center;justify-content:space-between}.hero h1{font-size:clamp(48px,8vw,100px);line-height:.9;margin:14px 0;max-width:850px;letter-spacing:-.055em}.lede{font-size:20px;color:#45657a}.eyebrow{text-transform:uppercase;letter-spacing:.16em;font-size:11px;font-weight:800;color:var(--coral)}.stat{display:grid;grid-template-columns:auto auto;gap:3px 12px;border-left:4px solid var(--teal);padding-left:18px}.stat b{font-size:30px}.stat span{align-self:center;color:#587287}.section-head{display:flex;justify-content:space-between;align-items:end;margin:70px 0 22px}.section-head h2,.method h2{font-size:34px;margin:6px 0}.section-head p{font-size:13px;color:#587287}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}.card{background:white;border:1px solid #dce5e9;border-radius:14px;padding:22px;box-shadow:0 8px 30px rgba(16,42,67,.05)}.card h3{font-size:22px;margin:8px 0}.card p{line-height:1.55}.evidence{font:11px ui-monospace,monospace;color:#587287}.wide{width:100%;margin-top:18px;border-radius:14px}.split{display:grid;grid-template-columns:1.15fr .85fr;gap:18px}.split img{width:100%;background:white;border-radius:14px;border:1px solid #dce5e9}table{width:100%;border-collapse:collapse;margin-top:20px;background:white;border-radius:12px;overflow:hidden}th,td{text-align:left;padding:13px;border-bottom:1px solid #e3eaed;font-size:13px}.method{display:grid;grid-template-columns:1fr 1fr;background:var(--ink);color:white;padding:35px;margin:70px 0 30px;border-radius:16px}.method li{margin:10px 0;color:#dce8ed}footer{font-size:12px;color:#5b7383;padding:25px 0 50px;border-top:1px solid #d3dee3}@media(max-width:760px){.hero,.section-head{display:block}.stat{margin-top:35px;width:max-content}.split,.method{grid-template-columns:1fr}.hero{padding:70px 0}.section-head p{margin-top:8px}}
-    .source-logo{width:150px;height:auto;margin-bottom:12px}
-    """
+:root{--ink:#102a43;--teal:#007c7c;--coral:#b9473d;--paper:#f7f5ef}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font-family:Inter,system-ui,sans-serif}header{display:flex;justify-content:space-between;padding:22px 5vw;border-bottom:1px solid #cdd9df}.brand{font-weight:900;letter-spacing:.08em}.brand span{color:var(--teal)}main{max-width:1050px;margin:auto;padding:0 28px}.hero{padding:90px 0 55px}.hero h1{font-size:clamp(48px,8vw,92px);line-height:.92;margin:12px 0;letter-spacing:-.05em}.hero p{max-width:720px;font-size:19px;color:#45657a}.eyebrow{text-transform:uppercase;letter-spacing:.16em;font-size:11px;font-weight:800;color:var(--coral)}.stats{display:flex;gap:15px;align-items:baseline;margin-top:28px}.stats b{font-size:28px}.stats span{color:#587287;margin-right:18px}section{margin:35px 0 65px}h2{font-size:34px;margin:8px 0 18px}table{width:100%;border-collapse:collapse;background:white;border-radius:12px;overflow:hidden}th,td{text-align:left;padding:13px;border-bottom:1px solid #e3eaed;font-size:13px}.limits{background:#102a43;color:white;padding:28px;border-radius:14px}.limits li{margin:9px 0;color:#dce8ed}footer{border-top:1px solid #d3dee3;padding:28px 0 50px;font-size:12px;color:#5b7383}footer img{width:150px}@media(max-width:680px){header{display:block}.hero{padding-top:55px}.stats{display:grid;grid-template-columns:auto 1fr}th,td{padding:9px 6px;font-size:11px}}
+"""
 
 
-def dump_bundle(bundle: dict[str, object], output: Path) -> None:
-    output.write_text(json.dumps(bundle, indent=2, ensure_ascii=False), encoding="utf-8")
-
-
-def preparation_brief_html(
-    bundle: dict[str, object],
-    comparisons: list[dict[str, object]],
-    baseline_label: str,
-    recent_matches: int,
-    baseline_matches: int,
-) -> str:
-    """Return a short deterministic, self-contained briefing for the current UI state."""
-    selected = [row for row in comparisons if row.get("publish")][:5]
-    if not selected:
-        selected_html = "<p><strong>No broad routine difference passed every evidence gate.</strong> Review the suppressed diagnostics.</p>"
-    else:
-        selected_html = "".join(
-            f"<article><h3>{escape(str(row['routine']))}</h3>"
-            f"<p>{float(row['recent_share'])*100:.1f}% recent versus {float(row['baseline_share'])*100:.1f}% baseline. "
-            f"Difference {float(row['absolute_share_difference'])*100:+.1f} percentage points. "
-            f"n={row['sample_size']}, baseline n={row['baseline_sample_size']}; {escape(str(row['stability']))}.</p>"
-            f"<p>Evidence: {escape(', '.join(str(value) for value in row['evidence_ids']))}</p></article>"
-            for row in selected
-        )
-    quality = bundle.get("set_piece_lab", {}).get("quality", {})
-    warnings = list(bundle["data"].get("limitations", []))
-    for key, label in (("corner_length_complete", "corner delivery length"), ("locations_complete", "event locations"), ("movement_endpoints_complete", "movement endpoints"), ("shot_xg_complete", "shot xG")):
-        if key in quality and float(quality[key]) < 0.90:
-            warnings.insert(0, f"{label.title()} completeness is {float(quality[key])*100:.1f}%, below the 90% publication threshold.")
-    warning_html = "".join(f"<li>{escape(str(item))}</li>" for item in warnings)
-    return f"""<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
-<title>SignalRoom briefing | {escape(str(bundle['case']['team']))}</title>
-<style>body{{font-family:Inter,system-ui,sans-serif;color:#102a43;background:#f7f5ef;max-width:900px;margin:0 auto;padding:40px 24px;line-height:1.45}}h1{{font-size:48px;line-height:1;margin:12px 0}}h2{{margin-top:42px}}.eyebrow{{color:#9e3e35;text-transform:uppercase;letter-spacing:.14em;font-size:11px;font-weight:800}}article{{background:white;border:1px solid #d7e1e6;border-radius:12px;padding:18px;margin:12px 0}}.meta{{color:#587287}}footer{{border-top:1px solid #d7e1e6;margin-top:42px;padding-top:18px;font-size:12px;color:#587287}}</style></head>
-<body><div class='eyebrow'>SignalRoom · evidence-first opponent preparation</div><h1>{escape(str(bundle['case']['team']))}</h1>
-<p class='meta'>{escape(str(bundle['case']['competition']))} · {escape(str(bundle['case']['season']))} · {escape(baseline_label)} · recent {recent_matches} matches versus previous {baseline_matches}</p>
-<h2>Routine observations</h2>{selected_html}<h2>Definitions</h2><p>Shares describe recorded attacking-corner routines. They do not establish intent, effectiveness, or causality.</p>
-<h2>Data quality and limitations</h2><ul>{warning_html}</ul><p>Source revision: {escape(str(bundle['data']['source_revision']))}. Historical open data, not current tactical advice.</p>
-<footer>No affiliation with or endorsement by any club or provider is claimed. Every observation above links to source event sequences in the evidence room.</footer></body></html>"""
+def _brief_css() -> str:
+    return """body{font-family:Inter,system-ui,sans-serif;color:#102a43;background:#f7f5ef;max-width:900px;margin:0 auto;padding:40px 24px;line-height:1.45}h1{font-size:48px;line-height:1;margin:12px 0}h2{margin-top:42px}.eyebrow{color:#9e3e35;text-transform:uppercase;letter-spacing:.14em;font-size:11px;font-weight:800}article{background:white;border:1px solid #d7e1e6;border-radius:12px;padding:18px;margin:12px 0}.meta{color:#587287}footer{border-top:1px solid #d7e1e6;margin-top:42px;padding-top:18px;font-size:12px;color:#587287}"""

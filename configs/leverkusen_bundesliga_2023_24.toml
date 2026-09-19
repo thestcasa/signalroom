@@ -11,4 +11,7 @@ minimum_recent_matches = 5
 minimum_evidence_sequences = 3
 bootstrap_samples = 2000
 random_seed = 43
-
+load_complete_population = false
+expected_source_fixtures = 34
+peer_population_eligible = false
+population_scope = "selected-team-release"

@@ -1,26 +1,33 @@
-import json
-
 from signalroom.reporting import preparation_brief_html
 
 
-def test_briefing_export_is_deterministic_and_grounded():
+def test_briefing_export_is_deterministic_and_matches_selected_state():
     bundle = {
-        "case": {"team": "Example FC", "competition": "Test League", "season": "2024"},
-        "data": {"source_revision": "abc", "limitations": ["Historical only"]},
+        "case": {
+            "team": "Example FC",
+            "competition": "Test League",
+            "season": "2024",
+            "historical_cutoff": "2024-05-01",
+        },
+        "data": {"limitations": ["Historical only"]},
     }
     comparison = {
-        "routine": "left / direct",
-        "publish": True,
-        "recent_share": 0.6,
-        "baseline_share": 0.2,
-        "absolute_share_difference": 0.4,
-        "sample_size": 6,
-        "baseline_sample_size": 5,
-        "stability": "stable",
-        "evidence_ids": ["SP-1-2"],
+        "delivery_group": "left / direct / central box lane",
+        "review_eligible": True,
+        "recent_count": 6,
+        "recent_total": 10,
+        "reference_count": 2,
+        "reference_total": 10,
+        "share_difference": 0.4,
+        "ci_low": 0.1,
+        "ci_high": 0.7,
+        "recent_match_support": 4,
+        "reference_match_support": 2,
+        "evidence_ids": ["DB-1-2"],
     }
-    first = preparation_brief_html(bundle, [comparison], "previous team window", 6, 5)
-    second = preparation_brief_html(bundle, [comparison], "previous team window", 6, 5)
+    first = preparation_brief_html(bundle, [comparison], "preceding window", 6, 5, "Check video")
+    second = preparation_brief_html(bundle, [comparison], "preceding window", 6, 5, "Check video")
     assert first == second
-    assert "SP-1-2" in first
-    json.loads(json.dumps(bundle, allow_nan=False))
+    assert "DB-1-2" in first
+    assert "Check video" in first
+    assert "match-block" in first

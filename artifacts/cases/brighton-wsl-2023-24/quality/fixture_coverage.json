@@ -1,0 +1,11 @@
+{
+  "scope": "complete-competition-season",
+  "expected_fixtures": 132,
+  "source_manifest_fixtures": 132,
+  "selected_fixtures": 132,
+  "received_fixtures": 132,
+  "missing_fixture_ids": [],
+  "complete": true,
+  "peer_population_eligible": true,
+  "manifest_sha256": "b40522c83db707e005083e30e619150961d4ad03db88c705f28ba3f0b2549b1a"
+}

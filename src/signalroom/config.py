@@ -21,11 +21,19 @@ class CaseConfig:
     minimum_evidence_sequences: int = 3
     bootstrap_samples: int = 2000
     random_seed: int = 42
+    load_complete_population: bool = False
+    expected_source_fixtures: int | None = None
+    peer_population_eligible: bool = False
+    population_scope: str = "selected-team-season"
 
     def __post_init__(self) -> None:
         if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", self.slug):
             raise ValueError("slug must contain lowercase letters, numbers, and single hyphens")
-        if not self.team.strip() or not self.competition_label.strip() or not self.season_label.strip():
+        if (
+            not self.team.strip()
+            or not self.competition_label.strip()
+            or not self.season_label.strip()
+        ):
             raise ValueError("team, competition_label, and season_label must be non-empty")
         if self.competition_id <= 0 or self.season_id <= 0:
             raise ValueError("competition_id and season_id must be positive")
@@ -39,6 +47,10 @@ class CaseConfig:
             raise ValueError("minimum_evidence_sequences must be positive")
         if self.bootstrap_samples < 100:
             raise ValueError("bootstrap_samples must be at least 100")
+        if self.expected_source_fixtures is not None and self.expected_source_fixtures < 1:
+            raise ValueError("expected_source_fixtures must be positive when declared")
+        if self.peer_population_eligible and not self.load_complete_population:
+            raise ValueError("peer_population_eligible requires load_complete_population")
 
     @classmethod
     def from_toml(cls, path: str | Path) -> CaseConfig:

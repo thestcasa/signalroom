@@ -1,0 +1,11 @@
+{
+  "scope": "selected-team-release",
+  "expected_fixtures": 34,
+  "source_manifest_fixtures": 34,
+  "selected_fixtures": 34,
+  "received_fixtures": 34,
+  "missing_fixture_ids": [],
+  "complete": true,
+  "peer_population_eligible": false,
+  "manifest_sha256": "04e7c345679f696efb8119217680b2afd2a238f876811ce0d954aaf8d74ff7c3"
+}

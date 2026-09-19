@@ -1,9 +1,12 @@
-# Three-minute demo script
+# Ten-minute historical demonstration
 
-1. Open the Brighton historical case and state the contract: every headline needs a definition, two windows, uncertainty, and event evidence.
-2. Show the briefing. Emphasize that the system can abstain and exposes suppressed metrics.
-3. Open SetPieceLab. Explain the 20-second same-possession sequence rule and minimum cluster size.
-4. Select one evidence reference. Show the match ID, event IDs, players, locations, and ordered source records.
-5. Switch to Bayer Leverkusen. Point out that the analytical code did not change, only the configuration.
-6. End on limitations: public historical event data, no off-ball tracking, no causal or current-tactics claim.
+1. Show the selected team, competition, historical cutoff, 132-fixture WSL coverage, and unavailable modalities.
+2. Set the recent and preceding windows once.
+3. Show the delivery-group difference chart with n/N, match support, and match-block interval.
+4. Open three matching derived summaries from different matches.
+5. Include an ordinary or unsuccessful example.
+6. Add one cautious analyst note and export the current state.
+7. Ask whether the workflow saved time or improved evidence clarity.
+
+Do not lead with event counts, deployment technology, tests, ML, or a tactical recommendation.
 

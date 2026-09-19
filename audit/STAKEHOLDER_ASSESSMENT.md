@@ -1,4 +1,6 @@
-# Stakeholder assessment
+# Stakeholder assessment (superseded)
+
+Current positioning and readiness are in `../AUDIT.md` and `REMAINING_RISKS.md`. This file is retained as a historical assessment.
 
 SignalRoom is a polished and unusually honest portfolio demonstration. It shows that Alessandro can acquire and normalize event data, define defensible metrics, implement statistical gates, trace outputs to source events, build an analyst-facing interface, and suppress findings when evidence is weak.
 

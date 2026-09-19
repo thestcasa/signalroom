@@ -1,45 +1,28 @@
 # Analyst validation package
 
-External analyst validation has not yet occurred. This package is ready for two or three future reviewers.
+This package is prepared but has not been executed.
 
 ## Task
 
-Give the analyst one historical opponent case and ask: “In five minutes, identify the opponent’s most distinctive attacking dead-ball behaviour, choose one pattern worth review, open its supporting sequence, and state what you would ask the set-piece team to examine.”
+Using one historical case, identify one recorded delivery-group tendency, compare it with the preceding window, retrieve three matching examples across at least two matches, inspect one ordinary or unsuccessful example, and write one cautious preparation question.
 
-## Test script
+## Comparator
 
-1. Start from the opening screen without explanation.
-2. Record time to state the product purpose.
-3. Ask them to identify one repeated or recent dead-ball observation.
-4. Ask them to select one pattern worth review and open a supporting sequence.
-5. Ask what should be reviewed by coaching or the set-piece team, without prescribing a solution.
-6. Ask them to download or summarize the preparation briefing.
-7. Do not correct them during the task.
+Complete the same task using a simple spreadsheet or the analyst's normal historical event workflow.
 
-## Correctness checks and measures
+## Measures
 
-- The analyst distinguishes recent share from previous share.
-- Sample size and uncertainty are visible before a conclusion.
-- A suppressed result is not mistaken for a positive finding.
-- The selected evidence ID resolves to source events.
-- The analyst does not interpret descriptive share as causal effectiveness.
-- Record time to purpose, first defensible observation, evidence sequence, unsupported claims, export completion, and confidence from 1 to 5.
+- task completion
+- time to first defensible observation
+- time to three matching examples
+- unsupported inference count
+- broken or irrelevant evidence references
+- export usefulness
+- correctness of population and uncertainty interpretation
+- stated reuse intent
 
-## Interview questions
+## Provisional success
 
-- What would you review next in your normal workflow?
-- Which wording felt unclear or too cautious?
-- Did the comparison baseline make sense?
-- Did the evidence sequence help you decide what to inspect?
-- What would make this useful before a real match?
-- Which missing context matters most: opponent quality, venue, score state, personnel, or video?
+At least two of three independent reviewers complete the task within five minutes, avoid unsupported intent or danger claims, and either save time or improve correctness relative to the baseline.
 
-## Feedback record
-
-| Reviewer | Role | Case | Purpose time | First observation time | Evidence time | Unsupported claims | Export completed | Notes |
-| --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- |
-|  |  |  |  |  |  |  |  |  |
-
-## Success criteria
-
-At least two of three reviewers should identify the baseline correctly, open a valid supporting sequence within five minutes, and avoid a causal or intent claim. Failure should trigger wording or evidence-room changes before adding new tactical modules.
+No result may be recorded until reviewers actually complete the protocol.

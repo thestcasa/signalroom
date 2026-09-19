@@ -8,11 +8,11 @@ def test_interactive_app_loads_both_cases_without_exceptions():
     app = AppTest.from_file(app_path, default_timeout=20).run()
     assert len(app.exception) == 0
     assert [tab.label for tab in app.tabs] == [
-        "Briefing",
-        "Dead-ball Lab",
-        "SetPieceLab",
-        "Evidence room",
-        "Method & limits",
+        "Overview",
+        "Review shortlist",
+        "Evidence review",
+        "Peer context",
+        "Method & quality",
     ]
     selector = app.selectbox[0]
     assert len(selector.options) == 2

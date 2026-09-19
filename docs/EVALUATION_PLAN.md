@@ -1,31 +1,25 @@
 # Evaluation plan
 
-## Automated checks
+## Automated acceptance
 
-- Source schema and unique event IDs
-- Monotonic event ordering
-- Metric boundaries and pass-completion rules
-- Corner sequence termination
-- Non-overlapping temporal windows
-- Bootstrap and false-discovery calculations
-- Sensitivity-window consistency
-- Minimum-sample suppression
-- Evidence IDs resolve to ingested source events
-- Generated narratives exactly match structured values
-- Configuration portability across two competitions
-- Corrupt cache recovery and atomic cache writes
-- Deterministic end-to-end pipeline build with synthetic fixtures
-- Short/direct corner classification and sequence-level shot conversion
-- Zero-variance statistical suppression without non-standard JSON values
+- All expected fixtures are present or explained.
+- Public bundles contain no raw provider record, source event ID, or exact source excerpt.
+- Every displayed evidence reference resolves and supports its predicate.
+- Coordinates transform into the selected-team frame and remain on the pitch.
+- Zero-valued coordinates are retained.
+- Player roles exclude opponent players unless the role explicitly identifies an opponent actor.
+- Direct free-kick shots do not enter conversion rankings.
+- Missing completeness metadata does not default to true.
+- Sequence termination and censoring are explicit.
+- Change intervals resample matches.
+- The application, evidence view, and export share one analysis state.
+- WSL fixture totals reconcile to 132 and 12 teams.
+- Leverkusen peer comparison is suppressed.
 
-## Real-data acceptance
+## Manual corpus
 
-Both checked-in configurations must build from an empty cache. The interactive interface must load both derived bundles. The static report and screenshots must display the same values as `bundle.json`.
+Each build produces `manual_review_sample.csv`, targeting 80 stratified sequences across teams, restart types, shot outcomes, and boundary states. Judgment-heavy fields require two reviewers and adjudication. Blank reviewer columns mean review is pending, not passed.
 
-GitHub Actions runs the locked environment setup, linter, and test suite for pushes and pull requests. Real-data regeneration remains a deliberate local acceptance check because it downloads the pinned provider snapshot.
+## External analyst validation
 
-## Statistical interpretation
-
-Intervals quantify match-to-match sampling variability within the selected historical schedule. They do not account for every confounder, including opponent strength, score state, injuries, coaching changes, or selection. The system identifies analyst review candidates, not causal tactical effects or predictive sporting value.
-
-References: Benjamini and Hochberg (1995), DOI `10.1111/j.2517-6161.1995.tb02031.x`; Wilson (1927), DOI `10.1080/01621459.1927.10502953`; Hedges (1981), DOI `10.3102/10769986006002107`.
+The protocol in `docs/ANALYST_VALIDATION_PROTOCOL.md` must be completed before any external-validation or club-readiness claim.

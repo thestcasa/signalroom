@@ -6,16 +6,31 @@ CAPABILITY_REGISTRY: dict[str, dict[str, Any]] = {
     "event": {
         "label": "Level 1 · event data",
         "supports": [
-            "restart classification", "delivery locations", "recorded first contact",
-            "shots and xG", "second-phase recorded events", "player involvement",
+            "recorded restart classification",
+            "delivery locations",
+            "first recorded post-delivery event",
+            "shots and xG",
+            "recorded player roles",
         ],
-        "cannot_verify": ["off-ball movement", "screens", "marking structure", "video clips"],
+        "cannot_verify": [
+            "physical first contact",
+            "football phases",
+            "off-ball movement",
+            "screens",
+            "marking structure",
+            "tactical intent",
+            "video clips",
+        ],
         "source_status": "implemented",
     },
     "event_360": {
         "label": "Level 2 · event plus 360",
-        "supports": ["player positions", "team shape", "runs into zones", "spacing"],
-        "cannot_verify": ["synchronized video review"],
+        "supports": [
+            "event-linked position snapshots",
+            "visible-area polygons",
+            "spacing at a snapshot",
+        ],
+        "cannot_verify": ["continuous runs", "screens", "assignments", "synchronized video review"],
         "source_status": "adapter-ready, not used in current cases",
     },
     "tracking": {

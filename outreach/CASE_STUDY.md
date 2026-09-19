@@ -1,33 +1,9 @@
-# Historical case study
+# SignalRoom historical set-piece evidence workbench
 
-## Question
+SignalRoom is an independent portfolio project that turns historical open event data into a reviewable set-piece workflow.
 
-Can public event data produce a concise, auditable briefing without turning ordinary variation into a tactical claim?
+The current version loads the complete 132-match FA Women's Super League 2023/24 season, compares recorded corner delivery groups across declared match windows, provides descriptive leave-target-out peer context, and links every displayed reference to a rights-safe derived evidence summary. It also includes a 34-match Bayer Leverkusen case, while correctly suppressing a Bundesliga peer baseline because the release is not a complete league population.
 
-## Cases
+The project emphasizes analytical contracts, fixture reconciliation, match-aware uncertainty, evidence integrity, source rights, deterministic exports, and honest unavailable states. It does not infer routines, movement, intent, danger, or defensive assignments from event data.
 
-- Brighton & Hove Albion Women, FA WSL 2023/24: primary historical example.
-- Bayer Leverkusen, Bundesliga 2023/24: portability check.
-
-## Method
-
-SignalRoom compares a recent match window with the immediately preceding, non-overlapping baseline. Seven metrics pass through effect-size, bootstrap direction, sensitivity, multiple-comparison, and evidence gates. SetPieceLab groups attacking corners by delivery side, short/direct choice, and target zone, requiring at least four examples per published routine.
-
-## Result
-
-Brighton: all seven broad changes were suppressed. Their standardized effects ranged from -0.35 to 0.42, and none cleared the combined magnitude, stability, sensitivity, and multiple-comparison gate. This is not evidence that tactics did not change. It means this design should not promote a broad change from the available sample.
-
-SetPieceLab processed 92 Brighton attacking corners. Three groups met the minimum cluster size: right/direct/central (45 corners, 17 shot-producing sequences, 17 total shots, 1.91 xG), left/direct/central (35, 8, 10, 1.54 xG), and right/direct/near-side (6, 3, 3, 0.24 xG). Each output has concrete source sequences. Conversion counts corner sequences with at least one shot, while rebound shots remain visible in the separate total-shot count.
-
-The same pipeline processed Bayer Leverkusen through configuration only: 34 matches, 236 attacking corners, and eight published routine groups. Its broad comparisons were also suppressed after false-discovery control.
-
-## Interpretation
-
-The output is a triage layer for analyst review. It is not a causal explanation, a prediction of match outcomes, or current tactical advice.
-
-## Deliverables
-
-- Interactive Streamlit application: run `make demo`
-- Static case reports: `artifacts/cases/*/report.html`
-- Shareable one-page PDF: `outreach/SignalRoom_Case_Study.pdf`
-- Machine-auditable bundles: `artifacts/cases/*/bundle.json`
+SignalRoom has not been externally validated or adopted by a club. The next meaningful test is whether independent analysts can retrieve defensible historical examples faster or more accurately than with a simple baseline workflow.

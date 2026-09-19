@@ -1,4 +1,6 @@
-# Audit changelog
+# Audit changelog (pre-milestone history)
+
+Current milestone changes are summarized in `MILESTONE_REGRESSION.md`.
 
 ## Analytical correctness
 

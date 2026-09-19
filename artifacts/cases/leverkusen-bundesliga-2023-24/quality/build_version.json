@@ -1,0 +1,28 @@
+{
+  "provider": "statsbomb-open-data",
+  "revision": "4b73468fc5b0f1950f9f66fada70ad3a4f9327cb",
+  "competition_scope": "selected-team-release",
+  "expected_fixtures": 34,
+  "received_fixtures": 34,
+  "modalities": [
+    "events",
+    "lineups"
+  ],
+  "event_files_sha256": "cff4e4f6d2ac51627c9ad3f0dde8e5532902ea9ce907a63c51c413d94c2df330",
+  "lineup_files_sha256": "6ff5a57dbb8112b95609855ba36f0b410f17faab6e558b6b91b387effb8bd1be",
+  "rights": {
+    "provider": "statsbomb-open-data",
+    "source_revision": "4b73468fc5b0f1950f9f66fada70ad3a4f9327cb",
+    "publication_mode": "public-analysis-only",
+    "license_reference": "https://github.com/hudl/open-data/blob/master/LICENSE.pdf",
+    "attribution": {
+      "name": "StatsBomb Open Data",
+      "logo_required": true
+    },
+    "blocked_public_artifacts": [
+      "raw records",
+      "source event identifiers",
+      "source event excerpts"
+    ]
+  }
+}

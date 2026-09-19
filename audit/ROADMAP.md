@@ -1,4 +1,6 @@
-# Prioritized roadmap
+# Prioritized roadmap (superseded)
+
+Current implementation status is in `../docs/IMPLEMENTATION_PLAN.md`. This file describes the earlier roadmap.
 
 ## 1. Opponent-preparation comparison, delivered
 

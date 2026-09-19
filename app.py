@@ -6,10 +6,10 @@ from html import escape
 from pathlib import Path
 
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
+from signalroom.evidence import validate_bundle_evidence
 from signalroom.models import EvidenceSequence
 from signalroom.opponent import compare_routines
 from signalroom.reporting import preparation_brief_html
@@ -22,35 +22,35 @@ st.markdown(
     """
     <style>
     :root { --ink:#102A43; --teal:#007C7C; --coral:#B9473D; --paper:#F7F5EF; }
-    .stApp { background: var(--paper); color: var(--ink); }
-    [data-testid="stHeader"] { background: rgba(247,245,239,.9); }
-    .block-container { max-width: 1240px; padding-top: 2rem; }
-    .brand { font-size:1.05rem; font-weight:900; letter-spacing:.13em; margin-bottom:2.5rem; }
+    .stApp { background:var(--paper); color:var(--ink); }
+    [data-testid="stHeader"] { background:rgba(247,245,239,.92); }
+    .block-container { max-width:1240px; padding-top:1.5rem; }
+    .brand { font-size:1.05rem; font-weight:900; letter-spacing:.13em; margin-bottom:1.7rem; }
     .brand span { color:var(--teal); }
     .eyebrow { color:var(--coral); text-transform:uppercase; letter-spacing:.16em; font-weight:800; font-size:.7rem; }
-    .hero-title { font-size:clamp(3rem,7vw,6.8rem); line-height:.89; font-weight:850; letter-spacing:-.06em; margin:.55rem 0 1rem; }
-    .hero-copy { color:#48677A; font-size:1.1rem; max-width:760px; }
-    .workflow { display:flex; gap:.55rem; flex-wrap:wrap; margin:1rem 0 1.6rem; }
-    .workflow span { background:#E8F1F5; border-radius:99px; padding:.45rem .7rem; font-size:.8rem; font-weight:750; }
-    .workflow b { color:var(--coral); margin-right:.3rem; }
-    .signal-card { background:white; border:1px solid #D7E1E6; border-radius:14px; padding:1.2rem; min-height:180px; box-shadow:0 8px 30px rgba(16,42,67,.045); }
-    .signal-card h3 { margin:.4rem 0 .65rem; font-size:1.25rem; }
-    .reliability { display:inline-block; padding:.23rem .55rem; border-radius:99px; background:#E2F5F1; color:#08766F; font-size:.68rem; font-weight:800; text-transform:uppercase; }
-    .evidence-code { font-family:ui-monospace,monospace; color:#587287; font-size:.72rem; }
+    .hero-title { font-size:clamp(3rem,7vw,6.2rem); line-height:.9; font-weight:850; letter-spacing:-.055em; margin:.55rem 0 1rem; }
+    .hero-copy { color:#48677A; font-size:1.08rem; max-width:790px; }
+    .context-strip { display:flex; gap:.55rem; flex-wrap:wrap; margin:1rem 0 1.5rem; }
+    .context-strip span { background:#E8F1F5; border-radius:99px; padding:.45rem .72rem; font-size:.78rem; font-weight:700; }
+    .evidence-card { background:white; border:1px solid #D7E1E6; border-radius:14px; padding:1.1rem; }
     .quiet { color:#587287; }
-    div[data-testid="stMetric"] { background:white; border:1px solid #D7E1E6; padding:1rem; border-radius:12px; }
+    div[data-testid="stMetric"] { background:white; border:1px solid #D7E1E6; padding:.9rem; border-radius:12px; }
+    .source-logo { width:155px; height:auto; margin-bottom:.8rem; }
     .footer { border-top:1px solid #D1DDE2; margin-top:3rem; padding:1.3rem 0; color:#587287; font-size:.78rem; }
-    .sr-image { display:block; width:100%; height:auto; border-radius:12px; }
-    .source-logo { width:165px; height:auto; margin-bottom:1rem; }
-    @media (max-width: 640px) {
-      .block-container { padding-top:1rem; }
-      .hero-title { font-size:2.6rem; overflow-wrap:anywhere; }
-      .brand { margin-bottom:1.4rem; }
-    }
+    @media (max-width:640px) { .block-container{padding-top:.8rem}.hero-title{font-size:2.55rem;overflow-wrap:anywhere}.brand{margin-bottom:1rem} }
     </style>
     """,
     unsafe_allow_html=True,
 )
+
+
+@st.cache_data
+def load_case(path: str) -> tuple[dict, pd.DataFrame]:
+    case_path = Path(path)
+    return (
+        json.loads((case_path / "bundle.json").read_text(encoding="utf-8")),
+        pd.read_csv(case_path / "match_metrics.csv"),
+    )
 
 
 @st.cache_data
@@ -59,20 +59,11 @@ def image_data_uri(path: str) -> str:
     return f"data:image/png;base64,{encoded}"
 
 
-def render_image(path: Path, alt: str, css_class: str = "sr-image") -> None:
+def render_logo(path: Path) -> None:
     st.markdown(
-        f'<img class="{escape(css_class)}" src="{image_data_uri(str(path))}" '
-        f'alt="{escape(alt)}">',
+        f'<img class="source-logo" src="{image_data_uri(str(path))}" alt="StatsBomb Open Data">',
         unsafe_allow_html=True,
     )
-
-
-@st.cache_data
-def load_case(path: str) -> tuple[dict, pd.DataFrame]:
-    case_path = Path(path)
-    bundle = json.loads((case_path / "bundle.json").read_text(encoding="utf-8"))
-    metrics = pd.read_csv(case_path / "match_metrics.csv")
-    return bundle, metrics
 
 
 case_dirs = sorted(path.parent for path in CASE_ROOT.glob("*/bundle.json"))
@@ -80,358 +71,343 @@ if not case_dirs:
     st.error("No case bundles found. Run `make build-cases` first.")
     st.stop()
 
-labels = {}
+labels: dict[str, Path] = {}
 for path in case_dirs:
     raw = json.loads((path / "bundle.json").read_text(encoding="utf-8"))
     labels[f"{raw['case']['team']} · {raw['case']['competition']} {raw['case']['season']}"] = path
 
 st.markdown('<div class="brand">SIGNAL<span>ROOM</span></div>', unsafe_allow_html=True)
-render_image(
-    ROOT / "assets" / "statsbomb-open-data-logo.png",
-    "StatsBomb Open Data",
-    "source-logo",
-)
+render_logo(ROOT / "assets" / "statsbomb-open-data-logo.png")
 selected_label = st.selectbox("Historical case", list(labels), label_visibility="collapsed")
 case_path = labels[selected_label]
 bundle, metrics = load_case(str(case_path))
 case = bundle["case"]
-dead_ball_lab = bundle.get("dead_ball_lab", {})
 
-match_ids = metrics["match_id"].astype(int).tolist()
-match_details = case.get("matches_detail") or [
-    {"match_id": int(row.match_id), "date": str(row.date), "opponent": str(row.opponent)}
-    for row in metrics.itertuples()
-]
+grounding_errors = validate_bundle_evidence(bundle)
+if grounding_errors:
+    st.error("This case failed evidence-integrity checks and cannot be displayed.")
+    st.code("\n".join(grounding_errors), language=None)
+    st.stop()
+
+match_details = case["matches_detail"]
+match_ids = [int(row["match_id"]) for row in match_details]
+match_dates = {int(row["match_id"]): str(row["date"]) for row in match_details}
 max_recent = max(2, min(10, len(match_ids) // 2))
 with st.sidebar:
-    st.markdown("### Preparation setup")
-    st.caption("Advanced controls stay out of the opening view.")
-    recent_n = st.slider("Recent window", 2, max_recent, min(6, max_recent))
-    max_baseline = max(2, len(match_ids) - recent_n)
-    baseline_n = st.slider("Previous window", 2, max_baseline, min(10, max_baseline))
+    st.markdown("### Analysis context")
+    st.caption("One context controls the shortlist, evidence and export.")
+    recent_n = st.slider("Recent matches", 2, max_recent, min(6, max_recent))
+    max_reference = max(2, len(match_ids) - recent_n)
+    reference_n = st.slider("Preceding matches", 2, max_reference, min(10, max_reference))
     dimensions = st.multiselect(
-        "Routine dimensions",
-        ["side", "type", "zone"],
-        default=["side", "type", "zone"],
-        help="Choose how routines are grouped. Use fewer dimensions for broader families.",
+        "Delivery-group dimensions",
+        ["side", "type", "lane"],
+        default=["side", "type", "lane"],
     )
-    minimum_sample = st.slider("Minimum routine sample", 2, 8, 4)
+    minimum_sample = st.slider("Minimum group sample", 2, 10, 4)
 
-corner_rows = bundle["set_piece_lab"].get("routine_index") or [
-    row for row in bundle["evidence"] if str(row["evidence_id"]).startswith("SP-")
-]
+recent_ids = match_ids[-recent_n:]
+reference_ids = match_ids[-recent_n - reference_n : -recent_n]
+context_ids = set(recent_ids + reference_ids)
+
 corner_sequences = [
     EvidenceSequence(
         evidence_id=str(row["evidence_id"]),
         match_id=int(row["match_id"]),
         match_date=str(row["match_date"]),
         opponent=str(row["opponent"]),
-        start_event_id=str(row["start_event_id"]),
-        source_event_ids=tuple(row["source_event_ids"]),
+        start_event_id="rights-blocked",
+        source_event_ids=(),
         label=str(row["label"]),
         start_minute=int(row["start_minute"]),
         events=tuple(row["events"]),
         quality=dict(row.get("quality", {})),
+        evidence_status=str(row.get("evidence_status", "available-derived-summary")),
+        termination_reason=str(row.get("termination_reason", "unknown")),
+        censoring_reason=row.get("censoring_reason"),
+        player_roles=dict(row.get("player_roles", {})),
     )
-    for row in corner_rows
+    for row in bundle["set_piece_lab"]["sequence_index"]
 ]
-recent_ids = match_ids[-recent_n:]
-baseline_ids = match_ids[-recent_n - baseline_n : -recent_n]
-routine_comparisons = compare_routines(
+comparisons = compare_routines(
     corner_sequences,
-    {int(row["match_id"]): str(row["date"]) for row in match_details},
+    match_dates,
     recent_ids,
-    baseline_ids,
+    reference_ids,
     dimensions=tuple(dimensions),
     minimum_sample=minimum_sample,
-    seed=int(bundle["method"].get("bootstrap_seed", 42)),
-    bootstrap_samples=1000,
+    seed=42,
+    bootstrap_samples=int(bundle["method"]["bootstrap_samples"]),
 )
-dead_ball_rows = [row for row in bundle["evidence"] if str(row["evidence_id"]).startswith("DB-")]
+comparison_rows = [row.to_dict() for row in comparisons]
+evidence_by_id = {str(row["evidence_id"]): row for row in bundle["evidence"]}
+eligible = [row for row in comparisons if row.review_eligible]
 
 st.markdown(
-    '<div class="eyebrow">Evidence-linked historical briefing</div>', unsafe_allow_html=True
+    '<div class="eyebrow">Historical set-piece evidence workbench</div>', unsafe_allow_html=True
+)
+st.markdown(f'<h1 class="hero-title">{escape(str(case["team"]))}</h1>', unsafe_allow_html=True)
+st.markdown(
+    f'<p class="hero-copy">{escape(str(bundle["positioning"]))}</p>', unsafe_allow_html=True
 )
 st.markdown(
-    f'<h1 class="hero-title">{escape(str(case["team"]))}</h1>', unsafe_allow_html=True
-)
-st.markdown(
-    '<p class="hero-copy">Evidence-first opponent preparation from recorded match events. '
-    "Find repeated or changing dead-ball behaviours, then open the sequences behind them.</p>",
+    f'<div class="context-strip"><span>Cutoff {escape(str(case["historical_cutoff"]))}</span>'
+    f"<span>Recent {recent_n} matches</span><span>Reference {reference_n} matches</span>"
+    f"<span>Event + lineup data</span><span>Historical only</span></div>",
     unsafe_allow_html=True,
 )
-st.markdown(
-    '<div class="workflow"><span><b>1</b>Choose the opponent</span><span><b>2</b>Find unusual or changing routines</span><span><b>3</b>Open the supporting evidence</span></div>',
-    unsafe_allow_html=True,
+
+coverage = bundle["data"]["coverage"]
+cols = st.columns(4)
+cols[0].metric("Target matches", case["matches"])
+cols[1].metric("Population fixtures", coverage["received_fixtures"])
+cols[2].metric("Recorded dead balls", bundle["dead_ball_lab"]["sequence_count"])
+cols[3].metric("Review-eligible changes", len(eligible))
+
+overview_tab, shortlist_tab, evidence_tab, peer_tab, method_tab = st.tabs(
+    ["Overview", "Review shortlist", "Evidence review", "Peer context", "Method & quality"]
 )
 
-metric_cols = st.columns(4)
-metric_cols[0].metric("Matches", case["matches"])
-metric_cols[1].metric("Source events", f"{bundle['data']['events']:,}")
-metric_cols[2].metric("Final-third dead balls", dead_ball_lab.get("sequence_count", 0))
-metric_cols[3].metric("Published changes", len(bundle["findings"]))
-
-briefing_tab, dead_ball_tab, set_piece_tab, evidence_tab, method_tab = st.tabs(
-    ["Briefing", "Dead-ball Lab", "SetPieceLab", "Evidence room", "Method & limits"]
-)
-
-with briefing_tab:
-    st.subheader("What deserves review?")
-    published_routines = [row for row in routine_comparisons if row.publish]
-    if published_routines:
-        st.success(f"{len(published_routines)} routine{'s' if len(published_routines) != 1 else ''} deserve review.")
-    else:
-        st.info("No broad routine difference passed every evidence gate.")
-    st.caption(
-        f"Selected team window: latest {recent_n} matches versus the previous {baseline_n}. "
-        "Historical evidence only."
+with overview_tab:
+    st.subheader("Preparation context")
+    context_frame = pd.DataFrame(
+        [
+            {
+                "Window": "Recent",
+                "From": match_dates[recent_ids[0]],
+                "To": match_dates[recent_ids[-1]],
+                "Matches": len(recent_ids),
+            },
+            {
+                "Window": "Reference",
+                "From": match_dates[reference_ids[0]],
+                "To": match_dates[reference_ids[-1]],
+                "Matches": len(reference_ids),
+            },
+        ]
     )
-    findings = bundle["findings"]
-    if not findings:
-        st.info(
-            "No broad tactical-change metric passed every publication gate. This abstention is an output, "
-            "not a missing report. Descriptive comparisons remain available below."
-        )
-    else:
-        columns = st.columns(min(3, len(findings)))
-        for index, finding in enumerate(findings):
-            with columns[index % len(columns)]:
-                st.markdown(
-                    f"""<div class="signal-card"><span class="reliability">{finding["reliability"]}</span>
-                    <h3>{finding["label"]}</h3><p>{finding["narrative"]}</p>
-                    <div class="evidence-code">{", ".join(finding["evidence_ids"])}</div></div>""",
-                    unsafe_allow_html=True,
-                )
-    render_image(
-        case_path / "assets" / "metric_comparison.png",
-        "Standardized comparison between baseline and recent match windows",
-    )
-    st.subheader("Routine share versus previous team window")
-    if routine_comparisons:
-        chart_frame = pd.DataFrame([
-            {"Routine": row.routine, "Recent share": row.recent_share * 100, "Previous share": row.baseline_share * 100, "Low": row.ci_low * 100, "High": row.ci_high * 100, "n": row.sample_size}
-            for row in routine_comparisons[:8]
-        ])
-        fig = go.Figure()
-        fig.add_bar(x=chart_frame["Routine"], y=chart_frame["Recent share"], name="Recent", marker_color="#007C7C")
-        fig.add_bar(x=chart_frame["Routine"], y=chart_frame["Previous share"], name="Previous", marker_color="#A9BDC7")
-        fig.update_layout(barmode="group", height=420, yaxis_title="Share of attacking corners (%)", xaxis_title=None, legend_title=None, margin=dict(l=20,r=20,t=40,b=100), title="Which corner routines changed share?")
-        st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
-        st.caption("Bars show exact shares. Sample sizes and uncertainty appear in the routine table.")
-    render_image(
-        case_path / "assets" / "metric_trend.png",
-        "Match-by-match trend for the strongest descriptive metric change",
-    )
-    with st.expander("Suppressed comparisons"):
-        suppressed = [row for row in bundle["comparisons"] if not row["publish"]]
-        st.dataframe(
-            pd.DataFrame(suppressed)[
-                [
-                    "label",
-                    "baseline_value",
-                    "recent_value",
-                    "standardized_effect",
-                    "q_value",
-                    "sensitivity_agreement",
-                    "suppression_reason",
-                ]
-            ],
-            hide_index=True,
-            width="stretch",
-        )
-
-with dead_ball_tab:
-    st.subheader("Attacking final-third dead balls")
-    st.caption(
-        "What this opponent records most often, what repeats across matches, and what deserves review. "
-        "All findings are event-only and descriptive."
-    )
-    summaries = pd.DataFrame(dead_ball_lab.get("summaries", []))
-    if summaries.empty:
-        st.info("No supported final-third dead-ball sequences are available.")
-    else:
-        display = summaries[["restart_type", "count", "matches", "rate_per_match", "share", "total_shots", "shot_producing_rate", "total_xg", "xg_per_restart", "second_phase_rate", "repetition_matches", "publication"]].copy()
-        for column in ["share", "shot_producing_rate", "second_phase_rate"]:
-            display[column] = (display[column] * 100).map(lambda value: f"{value:.1f}%")
-        for column in ["rate_per_match", "xg_per_restart"]:
-            display[column] = display[column].map(lambda value: "n/a" if pd.isna(value) else f"{value:.2f}")
-        display["total_xg"] = display["total_xg"].map(lambda value: "n/a" if pd.isna(value) else f"{value:.2f}")
-        st.dataframe(display.rename(columns={"restart_type": "restart", "count": "n", "matches": "matches with sequence", "rate_per_match": "per match", "share": "share", "total_shots": "shots", "shot_producing_rate": "shot-producing rate", "total_xg": "xG", "xg_per_restart": "xG / restart", "second_phase_rate": "second-phase rate", "repetition_matches": "repetition across matches"}), hide_index=True, width="stretch")
-        selected_restart = st.selectbox("Restart type", ["All"] + list(summaries["restart_type"]))
-        if selected_restart != "All":
-            selected_summary = next(row for row in dead_ball_lab["summaries"] if row["restart_type"] == selected_restart)
-            st.write({
-                "first-contact zones": selected_summary["first_contact_zones"],
-                "delivery targets": selected_summary["delivery_targets"],
-                "recurring players": selected_summary["recurring_players"],
-                "recurring combinations": selected_summary["recurring_combinations"],
-                "review questions": selected_summary["review_questions"],
-                "publication": selected_summary["publication"],
-                "suppression reasons": selected_summary["suppression_reasons"],
-            })
-    st.info("Capability: Level 1 event data. Video is not available in this data package, so off-ball movement, screens, marking and intent are not verified.")
-    st.subheader("Exploratory team profile")
-    st.write(dead_ball_lab.get("ml", {"status": "suppressed", "reason": "not available"}))
-
-with set_piece_tab:
-    st.subheader("Attacking corner routines")
-    st.caption(
-        "Deterministic grouping by delivery side, short/direct choice, and first delivery zone. "
-        "Routine shares include 95% Wilson intervals."
-    )
-    left, right = st.columns([1.15, 0.85])
-    with left:
-        render_image(
-            case_path / "assets" / "corner_map.png",
-            "Pitch map of attacking-corner delivery locations",
-        )
-    with right:
-        render_image(
-            case_path / "assets" / "routine_shares.png",
-            "Published attacking-corner routine shares with confidence intervals",
-        )
-    routines = pd.DataFrame(bundle["set_piece_lab"]["published_routines"])
-    if not routines.empty:
-        display = routines[
-            [
-                "routine",
-                "count",
-                "share",
-                "corners_with_shot",
-                "shot_rate",
-                "shots",
-                "xg",
-            ]
-        ].copy()
-        display["share"] = (display["share"] * 100).map(lambda value: f"{value:.1f}%")
-        display["shot_rate"] = (display["shot_rate"] * 100).map(lambda value: f"{value:.1f}%")
-        display["xg"] = display["xg"].map(lambda value: f"{value:.2f}")
-        display = display.rename(
-            columns={
-                "count": "corners",
-                "corners_with_shot": "shot-producing corners",
-                "shot_rate": "conversion",
-                "shots": "total shots",
+    st.dataframe(context_frame, hide_index=True, width="stretch")
+    st.subheader("Recorded dead-ball inventory in the selected context")
+    context_evidence = [row for row in bundle["evidence"] if int(row["match_id"]) in context_ids]
+    inventory = []
+    for restart_type in bundle["method"]["restart_taxonomy"]:
+        rows = [row for row in context_evidence if row["restart_type"] == restart_type]
+        inventory.append(
+            {
+                "Restart": restart_type.replace("_", " "),
+                "n": len(rows),
+                "Matches": len({row["match_id"] for row in rows}),
+                "Shot-producing": sum(int(row["shot_outcome"]["shot_count"]) > 0 for row in rows),
+                "xG": round(
+                    sum(float(row["shot_outcome"].get("total_xg") or 0) for row in rows), 3
+                ),
             }
         )
-        st.dataframe(display, hide_index=True, width="stretch")
-    st.subheader("Comparison observations")
-    quality = bundle["set_piece_lab"].get("quality", {})
-    st.caption("Data quality for the selected source sequences")
-    qcols = st.columns(4)
-    for column, (key, label) in zip(qcols, [("corner_length_complete", "Delivery length"), ("locations_complete", "Locations"), ("movement_endpoints_complete", "Move endpoints"), ("shot_xg_complete", "Shot xG")], strict=True):
-        column.metric(label, f"{float(quality.get(key, 1))*100:.1f}%")
-    st.caption("Routine share is suppressed below 90% completeness. Other metrics can remain valid when their own fields are complete.")
-    comparison_frame = pd.DataFrame([row.to_dict() for row in routine_comparisons])
-    if comparison_frame.empty:
-        st.info("No corner sequences are available for this configuration.")
+    st.dataframe(pd.DataFrame(inventory), hide_index=True, width="stretch")
+    st.info(
+        "Counts describe recorded event sequences. They do not reveal off-ball movement, legal direct/indirect status, tactical intent, or defensive assignments."
+    )
+
+with shortlist_tab:
+    st.subheader("Delivery-group changes worth checking")
+    if eligible:
+        st.success(
+            f"{len(eligible)} group difference{'s' if len(eligible) != 1 else ''} passed every review gate."
+        )
     else:
-        visible = comparison_frame[["routine", "count", "baseline_count", "recent_share", "baseline_share", "absolute_share_difference", "ci_low", "ci_high", "stability", "publish", "evidence_ids", "suppression_reasons"]].copy()
-        for column in ["recent_share", "baseline_share", "absolute_share_difference", "ci_low", "ci_high"]:
-            visible[column] = (visible[column] * 100).map(lambda value: f"{value:.1f}%")
-        visible = visible.rename(columns={"routine":"routine", "count":"recent n", "baseline_count":"previous n", "recent_share":"recent share", "baseline_share":"previous share", "absolute_share_difference":"difference", "ci_low":"CI low", "ci_high":"CI high", "publish":"published", "evidence_ids":"evidence", "suppression_reasons":"why suppressed"})
-        st.dataframe(visible, hide_index=True, width="stretch")
-        with st.expander("Why a routine was suppressed"):
-            suppressed = [row.to_dict() for row in routine_comparisons if not row.publish]
-            st.json(suppressed, expanded=False)
-    brief = preparation_brief_html(bundle, [row.to_dict() for row in routine_comparisons], "previous team window", recent_n, baseline_n)
-    st.download_button("Download deterministic briefing", data=brief, file_name=f"{case['slug']}-preparation-brief.html", mime="text/html")
+        st.info(
+            "No group difference passed every review gate. Descriptive rows remain visible without a change claim."
+        )
+    if comparisons:
+        plot_rows = comparisons[:10]
+        figure = go.Figure()
+        figure.add_trace(
+            go.Scatter(
+                x=[row.share_difference * 100 for row in plot_rows],
+                y=[row.delivery_group for row in plot_rows],
+                mode="markers",
+                marker={
+                    "color": ["#007C7C" if row.review_eligible else "#8CA5B1" for row in plot_rows],
+                    "size": 10,
+                },
+                error_x={
+                    "type": "data",
+                    "symmetric": False,
+                    "array": [(row.ci_high - row.share_difference) * 100 for row in plot_rows],
+                    "arrayminus": [(row.share_difference - row.ci_low) * 100 for row in plot_rows],
+                },
+                hovertemplate="%{y}<br>%{x:.1f} pp<extra></extra>",
+            )
+        )
+        figure.add_vline(x=0, line_dash="dot", line_color="#B9473D")
+        figure.update_layout(
+            height=max(360, 42 * len(plot_rows)),
+            xaxis_title="Recent minus reference share (percentage points)",
+            yaxis_title=None,
+            margin=dict(l=20, r=20, t=20, b=40),
+            plot_bgcolor="#FFFFFF",
+            paper_bgcolor="#F7F5EF",
+        )
+        st.plotly_chart(figure, width="stretch", config={"displayModeBar": False})
+        table = pd.DataFrame(
+            [
+                {
+                    "Delivery group": row.delivery_group,
+                    "Recent": f"{row.recent_count}/{row.recent_total}",
+                    "Reference": f"{row.reference_count}/{row.reference_total}",
+                    "Match support": f"{row.recent_match_support}/{row.reference_match_support}",
+                    "Difference": f"{row.share_difference * 100:+.1f} pp",
+                    "95% interval": f"[{row.ci_low * 100:.1f}, {row.ci_high * 100:.1f}] pp",
+                    "Nearby windows": row.window_sensitivity,
+                    "Review eligible": row.review_eligible,
+                    "Why suppressed": "; ".join(row.suppression_reasons),
+                }
+                for row in comparisons
+            ]
+        )
+        st.dataframe(table, hide_index=True, width="stretch")
+    notes = st.text_area(
+        "Analyst notes for this briefing",
+        key=f"notes-{case['slug']}",
+        placeholder="Record a cautious observation or question. Notes are kept only in this session and included in the export.",
+    )
+    brief = preparation_brief_html(
+        bundle,
+        comparison_rows,
+        "preceding team window",
+        recent_n,
+        reference_n,
+        notes,
+    )
+    st.download_button(
+        "Download current briefing",
+        data=brief,
+        file_name=f"{case['slug']}-historical-set-piece-brief.html",
+        mime="text/html",
+    )
 
 with evidence_tab:
-    st.subheader("Open the supporting sequences")
-    evidence = bundle["evidence"]
-    def evidence_label(row: dict) -> str:
-        return str(row.get("label") or row.get("restart_type") or "sequence")
-
-    def evidence_events(row: dict) -> list[dict]:
-        return list(row.get("events") or row.get("ordered_events") or [])
-
-    def evidence_minute(row: dict) -> int:
-        if "start_minute" in row:
-            return int(row["start_minute"])
-        first = evidence_events(row)
-        return int(first[0].get("minute", 0)) if first else 0
-
+    st.subheader("Derived evidence summaries")
+    st.caption(
+        "The public application exposes derived review cards, not raw provider records, exact source coordinates, or source event IDs."
+    )
+    group_options = ["All"] + [row.delivery_group for row in comparisons]
     col_a, col_b, col_c = st.columns(3)
     with col_a:
-        routine_filter = st.selectbox("Restart or routine", ["All"] + sorted({evidence_label(row) for row in evidence}))
+        selected_group = st.selectbox("Delivery group", group_options)
     with col_b:
-        opponent_filter = st.selectbox("Opponent", ["All"] + sorted({str(row["opponent"]) for row in evidence}))
+        selected_window = st.selectbox("Window", ["Recent", "Reference", "Both"])
     with col_c:
-        outcome_filter = st.selectbox("Outcome", ["All", "Shot-producing", "No shot"])
-    filtered_evidence = [row for row in evidence if (routine_filter == "All" or evidence_label(row) == routine_filter) and (opponent_filter == "All" or row["opponent"] == opponent_filter) and (outcome_filter == "All" or (outcome_filter == "Shot-producing") == any(event.get("type") == "Shot" and event.get("team") == case["team"] for event in evidence_events(row)))]
-    options = {
-        f"{row['evidence_id']} · {row['match_date']} vs {row['opponent']} · {evidence_label(row)}": row
-        for row in filtered_evidence
-    }
-    if not options:
-        st.warning("No sequences match these filters.")
-        st.stop()
-    selected_evidence = options[st.selectbox("Evidence sequence", list(options))]
-    info_cols = st.columns(4)
-    info_cols[0].metric("Reference", selected_evidence["evidence_id"])
-    info_cols[1].metric("Match ID", selected_evidence["match_id"])
-    info_cols[2].metric("Minute", evidence_minute(selected_evidence))
-    info_cols[3].metric("Source events", len(selected_evidence["source_event_ids"]))
-    event_frame = pd.DataFrame(evidence_events(selected_evidence))
-    st.dataframe(event_frame, hide_index=True, width="stretch")
-    locations = event_frame.dropna(subset=["location"])
-    if not locations.empty:
-        points = []
-        for _, row in locations.iterrows():
-            location = row["location"]
-            if location and location[0] is not None:
-                points.append(
-                    {
-                        "x": location[0],
-                        "y": location[1],
-                        "type": row["type"],
-                        "player": row["player"],
-                    }
-                )
-        if points:
-            chart = px.scatter(
-                pd.DataFrame(points),
-                x="x",
-                y="y",
-                color="type",
-                hover_name="player",
-                range_x=[0, 120],
-                range_y=[80, 0],
+        selected_outcome = st.selectbox("Outcome", ["All", "Shot-producing", "No shot"])
+    allowed_ids = set(
+        recent_ids
+        if selected_window == "Recent"
+        else reference_ids
+        if selected_window == "Reference"
+        else recent_ids + reference_ids
+    )
+    filtered = [row for row in bundle["evidence"] if int(row["match_id"]) in allowed_ids]
+    if selected_group != "All":
+        filtered = [row for row in filtered if row.get("delivery_group") == selected_group]
+    if selected_outcome != "All":
+        wants_shot = selected_outcome == "Shot-producing"
+        filtered = [
+            row for row in filtered if (int(row["shot_outcome"]["shot_count"]) > 0) == wants_shot
+        ]
+    if not filtered:
+        st.warning("No evidence summaries match this complete analysis context.")
+    else:
+        options = {
+            f"{row['evidence_id']} · {row['match_date']} vs {row['opponent']} · {row.get('delivery_group') or row['restart_type']}": row
+            for row in filtered
+        }
+        selected = options[st.selectbox("Evidence card", list(options))]
+        cards = st.columns(4)
+        cards[0].metric("Reference", selected["evidence_id"])
+        cards[1].metric("Date", selected["match_date"])
+        cards[2].metric("Minute", selected["minute"])
+        cards[3].metric("Termination", selected["termination_reason"])
+        left, right = st.columns(2)
+        with left:
+            st.markdown("#### Recorded delivery")
+            st.json(selected["delivery"], expanded=True)
+            st.markdown("#### Recorded player roles")
+            st.json(selected["player_roles"], expanded=True)
+        with right:
+            st.markdown("#### Outcome and availability")
+            st.json(
+                {
+                    "shot_outcome": selected["shot_outcome"],
+                    "first_post_delivery": selected["first_post_delivery"],
+                    "censoring_reason": selected["censoring_reason"],
+                    "evidence_status": selected["evidence_status"],
+                    "rights_class": selected["rights_class"],
+                },
+                expanded=True,
             )
-            chart.update_layout(height=420, plot_bgcolor="#113D36", paper_bgcolor="#F7F5EF")
-            st.plotly_chart(chart, width="stretch")
-    st.code("\n".join(selected_evidence["source_event_ids"]), language=None)
-    st.download_button("Export event identifiers", data="\n".join(selected_evidence["source_event_ids"]), file_name=f"{selected_evidence['evidence_id']}-events.txt", mime="text/plain")
+            st.markdown("#### Data quality")
+            st.json(selected["data_quality"], expanded=True)
+        st.markdown("#### Derived event timeline")
+        st.dataframe(pd.DataFrame(selected["timeline"]), hide_index=True, width="stretch")
+        st.caption(
+            f"Provenance: {selected['provenance']['provider']} at {selected['provenance']['source_revision']}. Return path: Evidence review → {selected['evidence_id']}."
+        )
+
+with peer_tab:
+    st.subheader("Complete competition peer context")
+    peer = bundle["peer_baseline"]
+    if peer.get("status") != "descriptive":
+        st.warning(f"Peer comparison unavailable: {peer.get('reason', 'undeclared reason')}")
+    else:
+        st.caption(
+            f"{peer['fixtures']} fixtures, {peer['teams']} teams, {peer['peer_teams']} leave-target-out peers. Descriptive season comparison only."
+        )
+        peer_rows = pd.DataFrame(peer["team_rows"])
+        display = peer_rows[
+            [
+                "team",
+                "matches",
+                "corners",
+                "corners_per_match",
+                "shot_producing_rate",
+                "eligible_players",
+            ]
+        ].copy()
+        display["corners_per_match"] = display["corners_per_match"].map(
+            lambda value: f"{value:.2f}"
+        )
+        display["shot_producing_rate"] = (display["shot_producing_rate"] * 100).map(
+            lambda value: f"{value:.1f}%"
+        )
+        st.dataframe(display, hide_index=True, width="stretch")
+        percentiles = peer["target_percentiles"]
+        pcols = st.columns(2)
+        pcols[0].metric(
+            "Corner rate percentile", f"{float(percentiles['corners_per_match']) * 100:.0f}th"
+        )
+        pcols[1].metric(
+            "Shot-producing percentile", f"{float(percentiles['shot_producing_rate']) * 100:.0f}th"
+        )
+        for limitation in peer["limitations"]:
+            st.markdown(f"- {limitation}")
 
 with method_tab:
-    st.subheader("Publication gates")
-    st.write(bundle["method"]["selection_rule"])
-    st.write("Capability registry", bundle.get("capability", {}))
-    st.write("Supported dead-ball taxonomy", dead_ball_lab.get("supported_restart_types", []))
-    st.write("Architecture-only future domains", dead_ball_lab.get("architecture_only_restart_types", []))
-    st.caption("Peer prevalence is not published unless complete comparable source coverage is loaded. Recent change and repetition are separate questions.")
+    st.subheader("Coverage ledger")
+    st.json(bundle["data"]["coverage"], expanded=True)
+    st.subheader("Rights-aware publication")
+    st.json(bundle["data"]["rights"], expanded=True)
+    st.subheader("Available modalities")
+    st.json(bundle["data"]["modalities"], expanded=True)
+    st.subheader("Analytical contract")
     st.json(bundle["method"], expanded=True)
-    st.subheader("Metric definitions")
-    definitions = pd.DataFrame(bundle["comparisons"])[["label", "definition", "unit"]]
-    st.dataframe(definitions, hide_index=True, width="stretch")
-    st.subheader("SetPieceLab definitions")
-    st.markdown(
-        "A short corner is a first delivery of at most 15 StatsBomb pitch units. "
-        "Conversion is the share of corners whose retained-possession sequence contains at least "
-        "one team shot within 20 seconds and 17 subsequent events. Total shots is shown separately."
-    )
     st.subheader("Known limitations")
     for limitation in bundle["data"]["limitations"]:
         st.markdown(f"- {limitation}")
-    st.markdown(
-        "**Positioning:** SignalRoom supports teams and competitions available through its implemented "
-        "event-data adapters. This version uses StatsBomb Open Data and is designed so additional "
-        "providers can be added later."
+    st.warning(
+        "SignalRoom has not been externally validated and must not be described as club-ready."
     )
 
 st.markdown(
-    f"""<div class="footer"><b>Data: StatsBomb Open Data.</b> No affiliation with {escape(str(case["team"]))} or any club is claimed.
-    This is a historical analytical case study, not current tactical advice. Source revision {escape(str(bundle["data"]["source_revision"]))}.</div>""",
+    f"""<div class="footer"><b>Data: StatsBomb Open Data.</b> Public output contains attributed analysis and derived evidence summaries, not redistributed raw records or source event IDs. Historical cutoff {escape(str(case["historical_cutoff"]))}. No club or provider endorsement, no tactical advice, and no external validation.</div>""",
     unsafe_allow_html=True,
 )

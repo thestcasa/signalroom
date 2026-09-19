@@ -4,26 +4,29 @@ import math
 from collections import defaultdict
 from dataclasses import asdict, dataclass
 
+from .adapters.statsbomb import SOURCE_REVISION
+from .deadballs import analyze_attacking_final_third_dead_balls
 from .models import Event, EvidenceSequence, Match
 
 
 @dataclass(frozen=True)
-class CornerRoutine:
-    routine: str
+class CornerDeliveryGroup:
+    delivery_group: str
     delivery_side: str
     delivery_type: str
-    target_zone: str
+    target_lane: str
     count: int
+    matches: int
     share: float
     share_ci_low: float
     share_ci_high: float
     shots: int
     corners_with_shot: int
-    xg: float
+    xg: float | None
     shot_rate: float
     evidence_ids: tuple[str, ...]
-    publish: bool
-    reliability: str
+    display_eligible: bool
+    status: str
 
     def to_dict(self) -> dict[str, object]:
         value = asdict(self)
@@ -32,130 +35,106 @@ class CornerRoutine:
 
 
 def analyze_attacking_corners(
-    matches: list[Match], events: list[Event], team: str, minimum_cluster: int = 4
-) -> tuple[list[CornerRoutine], list[EvidenceSequence]]:
-    match_map = {match.match_id: match for match in matches}
-    by_match: dict[int, list[Event]] = defaultdict(list)
-    for event in events:
-        by_match[event.match_id].append(event)
+    matches: list[Match], events: list[Event], team: str, minimum_group: int = 4
+) -> tuple[list[CornerDeliveryGroup], list[EvidenceSequence]]:
+    """Group recorded corner deliveries without claiming analyst-confirmed routines."""
+    _, dead_balls = analyze_attacking_final_third_dead_balls(
+        matches, events, team, SOURCE_REVISION, minimum_sample=minimum_group
+    )
+    corners = [row for row in dead_balls if row.restart_type == "corner"]
     sequences: list[EvidenceSequence] = []
-    records: list[dict[str, object]] = []
-    for match_id, match_events in by_match.items():
-        match_events.sort(key=lambda event: event.index)
-        positions = {event.event_id: index for index, event in enumerate(match_events)}
-        for corner in match_events:
-            if not _is_attacking_corner(corner, team):
-                continue
-            following = _corner_sequence(corner, match_events, positions[corner.event_id])
-            delivery_side = "left" if (corner.y or 0) < 40 else "right"
-            length = (corner.raw.get("pass") or {}).get("length")
-            if length is None:
-                delivery_type = "unknown"
-            else:
-                delivery_type = "short" if float(length) <= 15.0 else "direct"
-            target_zone = _target_zone(corner, delivery_side, delivery_type)
-            routine = f"{delivery_side} / {delivery_type} / {target_zone}"
-            shots = [
-                event for event in following if event.team == team and event.event_type == "Shot"
-            ]
-            match = match_map[match_id]
-            opponent = match.away_team if match.home_team == team else match.home_team
-            evidence_id = f"SP-{match_id}-{corner.index}"
-            sequences.append(
-                EvidenceSequence(
-                    evidence_id=evidence_id,
-                    match_id=match_id,
-                    match_date=match.date,
-                    opponent=opponent,
-                    start_event_id=corner.event_id,
-                    source_event_ids=tuple(event.event_id for event in following),
-                    label=routine,
-                    start_minute=corner.minute,
-                    events=tuple(_summary(event) for event in following),
-                    quality=_sequence_quality(corner, following),
-                )
-            )
-            records.append(
-                {
-                    "routine": routine,
-                    "delivery_side": delivery_side,
-                    "delivery_type": delivery_type,
-                    "target_zone": target_zone,
-                    "shots": len(shots),
-                    "has_shot": bool(shots),
-                    "xg": sum(float(shot.xg or 0) for shot in shots),
-                    "evidence_id": evidence_id,
-                }
-            )
-    total = len(records)
-    grouped: dict[str, list[dict[str, object]]] = defaultdict(list)
-    for record in records:
-        grouped[str(record["routine"])].append(record)
-    routines: list[CornerRoutine] = []
-    for routine, group in grouped.items():
-        count = len(group)
-        ci_low, ci_high = _wilson_interval(count, total)
-        shots = sum(int(row["shots"]) for row in group)
-        corners_with_shot = sum(bool(row["has_shot"]) for row in group)
-        publish = count >= minimum_cluster
-        routines.append(
-            CornerRoutine(
-                routine=routine,
-                delivery_side=str(group[0]["delivery_side"]),
-                delivery_type=str(group[0]["delivery_type"]),
-                target_zone=str(group[0]["target_zone"]),
-                count=count,
-                share=count / total if total else 0.0,
-                share_ci_low=ci_low,
-                share_ci_high=ci_high,
-                shots=shots,
-                corners_with_shot=corners_with_shot,
-                xg=sum(float(row["xg"]) for row in group),
-                shot_rate=corners_with_shot / count if count else 0.0,
-                evidence_ids=tuple(str(row["evidence_id"]) for row in group[:1]),
-                publish=publish,
-                reliability="descriptive" if publish else "suppressed: fewer than 4 corners",
+    for row in corners:
+        length = row.delivery.get("length")
+        delivery_type = (
+            "unknown" if length is None else "short" if float(length) <= 15.0 else "direct"
+        )
+        label = (
+            f"{row.delivery.get('side', 'unknown')} / {delivery_type} / "
+            f"{row.delivery.get('target_lane', 'unknown')}"
+        )
+        sequences.append(
+            EvidenceSequence(
+                evidence_id=row.evidence_id,
+                match_id=row.match_id,
+                match_date=row.match_date,
+                opponent=row.opponent,
+                start_event_id=row.start_event_id,
+                source_event_ids=row.source_event_ids,
+                label=label,
+                start_minute=_elapsed_minute(row.timestamp),
+                events=row.ordered_events,
+                quality={
+                    "delivery_length": row.data_quality.get("delivery_length", "unknown"),
+                    "locations": row.data_quality.get("event_locations", "unknown"),
+                    "movement_endpoints": row.data_quality.get("movement_endpoints", "unknown"),
+                    "shot_xg": row.data_quality.get("shot_xg", "unknown"),
+                    "sequence": row.data_quality.get("sequence", "unknown"),
+                },
+                predicate=label,
+                termination_reason=row.termination_reason,
+                censoring_reason=row.censoring_reason,
+                player_roles=row.player_roles,
             )
         )
-    routines.sort(key=lambda row: (row.publish, row.count, row.xg), reverse=True)
-    return routines, sequences
+    grouped: dict[str, list[EvidenceSequence]] = defaultdict(list)
+    for sequence in sequences:
+        grouped[sequence.label].append(sequence)
+    total = len(sequences)
+    output: list[CornerDeliveryGroup] = []
+    for label, rows in grouped.items():
+        side, delivery_type, target_lane = label.split(" / ", 2)
+        shots = [event for row in rows for event in row.events if event.get("type") == "Shot"]
+        shot_rows = [
+            row for row in rows if any(event.get("type") == "Shot" for event in row.events)
+        ]
+        xg_values = [event.get("xg") for event in shots]
+        xg = (
+            sum(float(value) for value in xg_values)
+            if all(value is not None for value in xg_values)
+            else None
+        )
+        low, high = _wilson_interval(len(rows), total)
+        eligible = len(rows) >= minimum_group
+        output.append(
+            CornerDeliveryGroup(
+                delivery_group=label,
+                delivery_side=side,
+                delivery_type=delivery_type,
+                target_lane=target_lane,
+                count=len(rows),
+                matches=len({row.match_id for row in rows}),
+                share=len(rows) / total if total else 0.0,
+                share_ci_low=low,
+                share_ci_high=high,
+                shots=len(shots),
+                corners_with_shot=len(shot_rows),
+                xg=xg,
+                shot_rate=len(shot_rows) / len(rows) if rows else 0.0,
+                evidence_ids=tuple(_diverse_ids(rows, 5)),
+                display_eligible=eligible,
+                status="descriptive" if eligible else "suppressed: fewer than four corners",
+            )
+        )
+    output.sort(key=lambda row: (row.display_eligible, row.count), reverse=True)
+    return output, sequences
 
 
-def _is_attacking_corner(event: Event, team: str) -> bool:
-    return event.team == team and event.event_type == "Pass" and event.subtype == "Corner"
+def _elapsed_minute(timestamp: str) -> int:
+    hours, minutes, _ = timestamp.split(":")
+    return int(hours) * 60 + int(minutes)
 
 
-def _corner_sequence(corner: Event, events: list[Event], position: int) -> list[Event]:
-    sequence = [corner]
-    start_seconds = _timestamp_seconds(corner.timestamp)
-    for event in events[position + 1 : position + 18]:
-        if event.period != corner.period:
+def _diverse_ids(rows: list[EvidenceSequence], limit: int) -> list[str]:
+    output: list[str] = []
+    seen: set[int] = set()
+    for row in sorted(rows, key=lambda item: (item.match_date, item.evidence_id), reverse=True):
+        if row.match_id in seen:
+            continue
+        output.append(row.evidence_id)
+        seen.add(row.match_id)
+        if len(output) == limit:
             break
-        elapsed = _timestamp_seconds(event.timestamp) - start_seconds
-        if elapsed > 20:
-            break
-        if event.possession != corner.possession:
-            break
-        sequence.append(event)
-    return sequence
-
-
-def _target_zone(corner: Event, side: str, delivery_type: str) -> str:
-    if delivery_type == "short":
-        return "short option"
-    if delivery_type == "unknown":
-        return "unknown"
-    if corner.end_y is None:
-        return "unknown"
-    if 32 <= corner.end_y <= 48:
-        return "central goalmouth"
-    same_side = (side == "left" and corner.end_y < 40) or (side == "right" and corner.end_y > 40)
-    return "near-side channel" if same_side else "far-side channel"
-
-
-def _timestamp_seconds(timestamp: str) -> float:
-    hours, minutes, seconds = timestamp.split(":")
-    return int(hours) * 3600 + int(minutes) * 60 + float(seconds)
+    return output
 
 
 def _wilson_interval(successes: int, total: int, z: float = 1.96) -> tuple[float, float]:
@@ -166,34 +145,3 @@ def _wilson_interval(successes: int, total: int, z: float = 1.96) -> tuple[float
     centre = proportion + z**2 / (2 * total)
     spread = z * math.sqrt(proportion * (1 - proportion) / total + z**2 / (4 * total**2))
     return (centre - spread) / denominator, (centre + spread) / denominator
-
-
-def _summary(event: Event) -> dict[str, object]:
-    return {
-        "event_id": event.event_id,
-        "index": event.index,
-        "minute": event.minute,
-        "second": event.second,
-        "team": event.team,
-        "player": event.player,
-        "type": event.event_type,
-        "outcome": event.outcome,
-        "location": [event.x, event.y],
-        "end_location": [event.end_x, event.end_y],
-        "xg": event.xg,
-    }
-
-
-def _sequence_quality(corner: Event, events: list[Event]) -> dict[str, object]:
-    moves = [event for event in events if event.event_type in {"Pass", "Carry"}]
-    shots = [event for event in events if event.event_type == "Shot"]
-    return {
-        "corner_length_available": (corner.raw.get("pass") or {}).get("length") is not None,
-        "locations_complete": all(event.x is not None and event.y is not None for event in events),
-        "movement_endpoints_complete": all(
-            event.end_x is not None and event.end_y is not None for event in moves
-        ),
-        "shot_xg_complete": all(event.xg is not None for event in shots),
-        "sequence_complete": True,
-        "event_count": len(events),
-    }

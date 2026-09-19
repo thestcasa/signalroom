@@ -5,23 +5,17 @@ from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass
 from typing import Any
 
+from .coordinates import event_coordinates
 from .models import DeadBallSequence, Event, Match
 
 FINAL_THIRD_X = 80.0
 RESTART_TYPES = (
     "corner",
-    "wide_free_kick",
-    "indirect_free_kick",
-    "direct_free_kick",
+    "wide_final_third_free_kick_pass",
+    "central_final_third_free_kick_pass",
+    "direct_free_kick_shot",
 )
-ARCHITECTURE_ONLY_TYPES = (
-    "attacking_throw_in",
-    "goal_kick",
-    "kick_off",
-    "penalty",
-    "defensive_dead_ball",
-)
-CONTACT_EVENTS = {"Ball Receipt*", "Duel", "Clearance", "Interception", "Shot"}
+STOPPAGE_EVENTS = {"Half End", "Injury Stoppage", "Offside", "Referee Ball-Drop"}
 
 
 @dataclass(frozen=True)
@@ -35,18 +29,15 @@ class DeadBallSummary:
     share_ci_high: float
     total_shots: int
     shot_producing_sequences: int
-    shot_producing_rate: float
+    shot_producing_rate: float | None
     total_xg: float | None
     xg_per_restart: float | None
     xg_per_shot: float | None
-    second_phase_rate: float
-    first_contact_zones: dict[str, int]
-    delivery_targets: dict[str, int]
-    recurring_players: list[dict[str, Any]]
-    recurring_combinations: list[dict[str, Any]]
+    first_post_delivery_events: dict[str, int]
+    delivery_target_lanes: dict[str, int]
+    player_roles: dict[str, list[dict[str, Any]]]
     repetition_matches: int
     evidence_ids: tuple[str, ...]
-    review_questions: tuple[str, ...]
     data_quality: dict[str, float]
     publication: str
     suppression_reasons: tuple[str, ...]
@@ -54,7 +45,6 @@ class DeadBallSummary:
     def to_dict(self) -> dict[str, Any]:
         value = asdict(self)
         value["evidence_ids"] = list(self.evidence_ids)
-        value["review_questions"] = list(self.review_questions)
         value["suppression_reasons"] = list(self.suppression_reasons)
         return value
 
@@ -66,12 +56,7 @@ def analyze_attacking_final_third_dead_balls(
     source_revision: str,
     minimum_sample: int = 4,
 ) -> tuple[list[DeadBallSummary], list[DeadBallSequence]]:
-    """Build deterministic, event-only sequences for the supported first domain.
-
-    Free-kick categories are location buckets. StatsBomb Open Data does not expose a
-    referee-certified direct/indirect flag on the restart pass, so the distinction is
-    deliberately descriptive and is shown as such in the product copy.
-    """
+    """Build event-bounded attacking restart observations, not inferred phases."""
     match_map = {match.match_id: match for match in matches}
     by_match: dict[int, list[Event]] = defaultdict(list)
     for event in events:
@@ -83,49 +68,58 @@ def analyze_attacking_final_third_dead_balls(
             restart_type = classify_restart(start, team)
             if restart_type is None:
                 continue
-            context = _sequence_window(start, ordered, position)
-            opponent = match_map[match_id].away_team if match_map[match_id].home_team == team else match_map[match_id].home_team
-            first_contact = _first_contact(context[1:])
-            second_phase = _second_phase(context, first_contact, team)
-            shots = [event for event in context if event.team == team and event.event_type == "Shot"]
-            participants = tuple(sorted({event.player for event in context if event.player}))
-            sequence = DeadBallSequence(
-                evidence_id=f"DB-{match_id}-{start.index}",
-                match_id=match_id,
-                match_date=match_map[match_id].date,
-                opponent=opponent,
-                period=start.period,
-                timestamp=start.timestamp,
-                restart_type=restart_type,
-                start_event_id=start.event_id,
-                source_event_ids=tuple(event.event_id for event in context),
-                ordered_events=tuple(_summary(event) for event in context),
-                participants=participants,
-                delivery=_delivery(start, restart_type),
-                first_contact=_contact_summary(first_contact) if first_contact else None,
-                second_phase=second_phase,
-                shot_outcome={
-                    "shot_count": len(shots),
-                    "total_xg": _sum_xg(shots),
-                    "goals": sum(event.outcome == "Goal" for event in shots),
-                },
-                data_quality=_quality(start, context, first_contact),
-                source_revision=source_revision,
-                capability_level="event",
+            context, termination, censoring = _sequence_window(start, ordered, position, team)
+            match = match_map[match_id]
+            opponent = match.away_team if match.home_team == team else match.home_team
+            after = context[1] if len(context) > 1 else None
+            shots = [
+                event for event in context if event.team == team and event.event_type == "Shot"
+            ]
+            sequences.append(
+                DeadBallSequence(
+                    evidence_id=f"DB-{match_id}-{start.index}",
+                    match_id=match_id,
+                    match_date=match.date,
+                    opponent=opponent,
+                    period=start.period,
+                    timestamp=start.timestamp,
+                    restart_type=restart_type,
+                    start_event_id=start.event_id,
+                    source_event_ids=tuple(event.event_id for event in context),
+                    ordered_events=tuple(_summary(event, team) for event in context),
+                    delivery=_delivery(start, restart_type, team),
+                    first_post_delivery=_post_delivery_summary(after, team) if after else None,
+                    player_roles=_player_roles(start, context, team),
+                    shot_outcome={
+                        "shot_count": len(shots),
+                        "total_xg": _sum_xg(shots),
+                        "goals": sum(event.shot_outcome == "Goal" for event in shots),
+                        "status": "observed" if shots else "not_applicable",
+                    },
+                    termination_reason=termination,
+                    censoring_reason=censoring,
+                    data_quality=_quality(start, context, after, censoring),
+                    source_revision=source_revision,
+                    capability_level="event",
+                )
             )
-            sequences.append(sequence)
-    return _summaries(sequences, matches, team, minimum_sample), sequences
+    return _summaries(sequences, matches, minimum_sample), sequences
 
 
 def classify_restart(event: Event, team: str) -> str | None:
     if event.team != team:
         return None
+    in_final_third = event.x is not None and event.x >= FINAL_THIRD_X
     if event.event_type == "Pass" and event.subtype == "Corner":
         return "corner"
-    if event.event_type == "Pass" and event.subtype == "Free Kick" and (event.x or 0) >= FINAL_THIRD_X:
-        return "wide_free_kick" if _is_wide(event.y) else "indirect_free_kick"
-    if event.event_type == "Shot" and event.subtype == "Free Kick" and (event.x or 0) >= FINAL_THIRD_X:
-        return "direct_free_kick"
+    if event.event_type == "Pass" and event.subtype == "Free Kick" and in_final_third:
+        return (
+            "wide_final_third_free_kick_pass"
+            if _is_wide(event.y)
+            else "central_final_third_free_kick_pass"
+        )
+    if event.event_type == "Shot" and event.subtype == "Free Kick" and in_final_third:
+        return "direct_free_kick_shot"
     return None
 
 
@@ -133,190 +127,289 @@ def _is_wide(y: float | None) -> bool:
     return y is not None and (y <= 18 or y >= 62)
 
 
-def _sequence_window(start: Event, events: list[Event], position: int) -> list[Event]:
+def _sequence_window(
+    start: Event, events: list[Event], position: int, team: str
+) -> tuple[list[Event], str, str | None]:
     if start.event_type == "Shot":
-        return [start]
+        return [start], "shot", None
     result = [start]
     start_seconds = _timestamp_seconds(start.timestamp)
-    for event in events[position + 1 : position + 18]:
-        if event.period != start.period or event.possession != start.possession:
+    candidates = events[position + 1 : position + 18]
+    termination = "source_end"
+    censoring: str | None = None
+    for event in candidates:
+        if event.period != start.period:
+            termination = "stoppage"
             break
         if _timestamp_seconds(event.timestamp) - start_seconds > 20:
+            termination = "time_limit"
+            censoring = "time_limit"
+            break
+        if event.possession != start.possession:
+            termination = "loss" if event.team != team else "reset"
             break
         result.append(event)
-    return result
+        if event.event_type == "Shot" and event.team == team:
+            termination = "shot"
+            break
+        if event.event_type in STOPPAGE_EVENTS:
+            termination = "stoppage"
+            break
+    else:
+        if len(candidates) == 17:
+            termination = "event_limit"
+            censoring = "event_limit"
+    return result, termination, censoring
 
 
-def _first_contact(events: list[Event]) -> Event | None:
-    return next((event for event in events if event.event_type in CONTACT_EVENTS), None)
-
-
-def _second_phase(events: list[Event], first_contact: Event | None, team: str) -> dict[str, Any]:
-    if first_contact is None:
-        return {"observed": False, "event_count": 0, "recycle_count": 0, "shot_count": 0}
-    later = [event for event in events if event.index > first_contact.index and event.team == team]
+def _delivery(start: Event, restart_type: str, team: str) -> dict[str, Any]:
+    start_point = event_coordinates(start, team)
+    end_point = event_coordinates(start, team, end=True)
+    end_x, end_y = end_point.canonical
+    pass_detail = start.raw.get("pass") or {}
+    technique = (pass_detail.get("technique") or {}).get("name")
     return {
-        "observed": bool(later),
-        "event_count": len(later),
-        "recycle_count": sum(event.event_type in {"Pass", "Carry"} for event in later),
-        "shot_count": sum(event.event_type == "Shot" for event in later),
+        "side": "left" if start.y is not None and start.y < 40 else "right",
+        "length": start.pass_length,
+        "height": start.pass_height,
+        "body_part": start.body_part,
+        "technique": start.technique,
+        "inswinging": technique == "Inswinging",
+        "outswinging": technique == "Outswinging",
+        "source_location_status": start_point.status,
+        "canonical_location_status": end_point.status,
+        "target_lane": _target_lane(end_x, end_y, start.pass_length),
+        "recorded_action": "shot" if restart_type == "direct_free_kick_shot" else "pass",
     }
 
 
-def _delivery(start: Event, restart_type: str) -> dict[str, Any]:
-    side = "left" if (start.y or 40) < 40 else "right"
-    target = _zone(start.end_x, start.end_y)
-    return {
-        "side": side,
-        "length": start.pass_length if start.pass_length is not None else (start.raw.get("pass") or {}).get("length"),
-        "start_location": [start.x, start.y],
-        "end_location": [start.end_x, start.end_y],
-        "target_zone": target,
-        "action": "direct shot" if restart_type == "direct_free_kick" else "first recorded restart action",
-    }
-
-
-def _zone(x: float | None, y: float | None) -> str:
+def _target_lane(x: float | None, y: float | None, length: float | None) -> str:
+    if length is not None and length <= 15:
+        return "short option"
     if x is None or y is None:
         return "unknown"
-    if x >= 105:
-        return "goalmouth"
-    if y < 28:
-        return "near-side wide"
-    if y > 52:
-        return "far-side wide"
-    return "central box"
+    if x >= 114 and 30 <= y <= 50:
+        return "central six-yard lane"
+    if x >= 102 and 18 <= y <= 62:
+        if y < 30:
+            return "left box lane"
+        if y > 50:
+            return "right box lane"
+        return "central box lane"
+    if x >= FINAL_THIRD_X:
+        return "outer final-third lane"
+    return "short or recycled lane"
 
 
-def _contact_summary(event: Event) -> dict[str, Any]:
+def _post_delivery_summary(event: Event, team: str) -> dict[str, Any]:
+    point = event_coordinates(event, team)
     return {
-        "event_id": event.event_id,
         "type": event.event_type,
-        "team": event.team,
+        "team_role": "selected_team" if event.team == team else "opponent",
         "player": event.player,
-        "location": [event.x, event.y],
-        "zone": _zone(event.x, event.y),
+        "body_part": event.body_part,
+        "outcome": event.outcome,
+        "location_status": point.status,
+        "lane": _target_lane(*point.canonical, None),
     }
 
 
-def _summary(event: Event) -> dict[str, Any]:
+def _player_roles(start: Event, events: list[Event], team: str) -> dict[str, Any]:
+    later_team_events = [event for event in events[1:] if event.team == team]
+    shots = [event for event in later_team_events if event.event_type == "Shot"]
+    first = events[1] if len(events) > 1 else None
     return {
-        "event_id": event.event_id,
+        "taker": start.player,
+        "intended_recipient": start.recipient,
+        "first_post_delivery_actor": first.player if first else None,
+        "first_post_delivery_actor_team": (
+            "selected_team" if first and first.team == team else "opponent" if first else None
+        ),
+        "shot_actors": sorted({event.player for event in shots if event.player}),
+        "later_selected_team_participants": sorted(
+            {event.player for event in later_team_events if event.player}
+        ),
+    }
+
+
+def _summary(event: Event, team: str) -> dict[str, Any]:
+    point = event_coordinates(event, team)
+    end_point = event_coordinates(event, team, end=True)
+    return {
         "index": event.index,
-        "minute": event.minute,
-        "second": event.second,
-        "team": event.team,
+        "elapsed_minute": event.minute,
+        "elapsed_second": event.second,
+        "team_role": "selected_team" if event.team == team else "opponent",
         "player": event.player,
         "type": event.event_type,
         "subtype": event.subtype,
         "outcome": event.outcome,
-        "location": [event.x, event.y],
-        "end_location": [event.end_x, event.end_y],
+        "body_part": event.body_part,
+        "location_status": point.status,
+        "canonical_location": list(point.canonical),
+        "canonical_end_location": list(end_point.canonical),
+        "coordinate_transform": point.transform_version,
         "xg": event.xg,
     }
 
 
-def _quality(start: Event, events: list[Event], first_contact: Event | None) -> dict[str, Any]:
+def _quality(
+    start: Event,
+    events: list[Event],
+    first_post_delivery: Event | None,
+    censoring: str | None,
+) -> dict[str, Any]:
     shots = [event for event in events if event.event_type == "Shot"]
     moves = [event for event in events if event.event_type in {"Pass", "Carry"}]
     return {
-        "delivery_location_complete": start.x is not None and start.y is not None and start.end_x is not None and start.end_y is not None,
-        "delivery_length_available": start.pass_length is not None or (start.raw.get("pass") or {}).get("length") is not None,
-        "first_contact_observed": first_contact is not None,
-        "first_contact_location_complete": first_contact is not None and first_contact.x is not None and first_contact.y is not None,
-        "event_locations_complete": all(event.x is not None and event.y is not None for event in events),
-        "movement_endpoints_complete": all(event.end_x is not None and event.end_y is not None for event in moves),
-        "shot_xg_complete": all(event.xg is not None for event in shots),
+        "delivery_location": (
+            "observed"
+            if all(value is not None for value in (start.x, start.y, start.end_x, start.end_y))
+            else "missing"
+        ),
+        "delivery_length": "observed" if start.pass_length is not None else "unavailable",
+        "first_post_delivery_event": "observed" if first_post_delivery else "unavailable",
+        "event_locations": (
+            "observed"
+            if all(event.x is not None and event.y is not None for event in events)
+            else "missing"
+        ),
+        "movement_endpoints": (
+            "observed"
+            if all(event.end_x is not None and event.end_y is not None for event in moves)
+            else "missing"
+        ),
+        "shot_xg": (
+            "not_applicable"
+            if not shots
+            else "observed"
+            if all(event.xg is not None for event in shots)
+            else "missing"
+        ),
+        "sequence": "censored" if censoring else "observed",
     }
 
 
 def _sum_xg(shots: list[Event]) -> float | None:
-    return sum(float(event.xg) for event in shots) if all(event.xg is not None for event in shots) else None
+    if not shots:
+        return 0.0
+    return (
+        sum(float(event.xg) for event in shots)
+        if all(event.xg is not None for event in shots)
+        else None
+    )
 
 
-def _summaries(sequences: list[DeadBallSequence], matches: list[Match], team: str, minimum_sample: int) -> list[DeadBallSummary]:
+def _summaries(
+    sequences: list[DeadBallSequence], matches: list[Match], minimum_sample: int
+) -> list[DeadBallSummary]:
     total = len(sequences)
     total_matches = len(matches)
     output: list[DeadBallSummary] = []
     for restart_type in RESTART_TYPES:
         rows = [row for row in sequences if row.restart_type == restart_type]
-        shots = [row for row in rows if int(row.shot_outcome["shot_count"]) > 0]
+        shot_rows = [row for row in rows if int(row.shot_outcome["shot_count"]) > 0]
+        shot_count = sum(int(row.shot_outcome["shot_count"]) for row in rows)
         xg_values = [row.shot_outcome["total_xg"] for row in rows]
-        total_xg = sum(float(value) for value in xg_values) if all(value is not None for value in xg_values) else None
+        total_xg = (
+            sum(float(value) for value in xg_values)
+            if all(value is not None for value in xg_values)
+            else None
+        )
         match_ids = {row.match_id for row in rows}
-        contacts = Counter((row.first_contact or {}).get("zone", "not observed") for row in rows)
-        targets = Counter(row.delivery.get("target_zone", "unknown") for row in rows)
-        players = Counter(player for row in rows for player in row.participants)
-        combos = Counter(tuple(row.participants) for row in rows if len(row.participants) >= 2)
+        first_events = Counter(
+            (row.first_post_delivery or {}).get("type", "unavailable") for row in rows
+        )
+        targets = Counter(row.delivery.get("target_lane", "unknown") for row in rows)
+        roles = {
+            role: Counter(
+                value for row in rows for value in _role_values(row.player_roles.get(role)) if value
+            )
+            for role in ("taker", "intended_recipient", "first_post_delivery_actor", "shot_actors")
+        }
         quality = _quality_rates(rows)
         reasons: list[str] = []
         if len(rows) < minimum_sample:
             reasons.append(f"sample too small: {len(rows)} sequences, minimum {minimum_sample}")
-        if total == 0:
-            reasons.append("no supported attacking final-third dead balls")
-        if quality["delivery_location_complete"] < 0.90:
+        if quality.get("delivery_location", 0.0) < 0.90:
             reasons.append("delivery location completeness below 90%")
-        publication = "published descriptive" if not reasons else "suppressed"
+        publication = "descriptive" if not reasons else "suppressed"
         low, high = _wilson_interval(len(rows), total)
-        output.append(DeadBallSummary(
-            restart_type=restart_type,
-            count=len(rows),
-            matches=len(match_ids),
-            rate_per_match=len(rows) / total_matches if total_matches else 0.0,
-            share=len(rows) / total if total else 0.0,
-            share_ci_low=low,
-            share_ci_high=high,
-            total_shots=sum(int(row.shot_outcome["shot_count"]) for row in rows),
-            shot_producing_sequences=len(shots),
-            shot_producing_rate=len(shots) / len(rows) if rows else 0.0,
-            total_xg=total_xg,
-            xg_per_restart=total_xg / len(rows) if total_xg is not None and rows else None,
-            xg_per_shot=total_xg / sum(int(row.shot_outcome["shot_count"]) for row in rows) if total_xg is not None and sum(int(row.shot_outcome["shot_count"]) for row in rows) else None,
-            second_phase_rate=sum(bool(row.second_phase["observed"]) for row in rows) / len(rows) if rows else 0.0,
-            first_contact_zones=dict(contacts),
-            delivery_targets=dict(targets),
-            recurring_players=[{"player": name, "count": count} for name, count in players.most_common(5)],
-            recurring_combinations=[{"players": list(names), "count": count} for names, count in combos.most_common(5)],
-            repetition_matches=len(match_ids),
-            evidence_ids=tuple(row.evidence_id for row in rows[:1]),
-            review_questions=_review_questions(restart_type, rows, contacts, players),
-            data_quality=quality,
-            publication=publication,
-            suppression_reasons=tuple(reasons),
-        ))
+        is_direct_shot = restart_type == "direct_free_kick_shot"
+        output.append(
+            DeadBallSummary(
+                restart_type=restart_type,
+                count=len(rows),
+                matches=len(match_ids),
+                rate_per_match=len(rows) / total_matches if total_matches else 0.0,
+                share=len(rows) / total if total else 0.0,
+                share_ci_low=low,
+                share_ci_high=high,
+                total_shots=shot_count,
+                shot_producing_sequences=len(shot_rows),
+                shot_producing_rate=(
+                    None if is_direct_shot else len(shot_rows) / len(rows) if rows else 0.0
+                ),
+                total_xg=total_xg,
+                xg_per_restart=total_xg / len(rows) if total_xg is not None and rows else None,
+                xg_per_shot=total_xg / shot_count if total_xg is not None and shot_count else None,
+                first_post_delivery_events=dict(first_events),
+                delivery_target_lanes=dict(targets),
+                player_roles={
+                    role: [
+                        {"player": player, "count": count}
+                        for player, count in counter.most_common(5)
+                    ]
+                    for role, counter in roles.items()
+                },
+                repetition_matches=len(match_ids),
+                evidence_ids=tuple(_diverse_evidence_ids(rows, 5)),
+                data_quality=quality,
+                publication=publication,
+                suppression_reasons=tuple(reasons),
+            )
+        )
     return output
 
 
+def _role_values(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [str(item) for item in value]
+    return [str(value)]
+
+
+def _diverse_evidence_ids(rows: list[DeadBallSequence], limit: int) -> list[str]:
+    selected: list[str] = []
+    seen_matches: set[int] = set()
+    for row in sorted(rows, key=lambda item: (item.match_date, item.evidence_id), reverse=True):
+        if row.match_id in seen_matches:
+            continue
+        selected.append(row.evidence_id)
+        seen_matches.add(row.match_id)
+        if len(selected) >= limit:
+            break
+    return selected
+
+
 def _quality_rates(rows: list[DeadBallSequence]) -> dict[str, float]:
+    keys = (
+        "delivery_location",
+        "delivery_length",
+        "first_post_delivery_event",
+        "event_locations",
+        "movement_endpoints",
+        "shot_xg",
+        "sequence",
+    )
     if not rows:
-        return {key: 0.0 for key in ("delivery_location_complete", "delivery_length_available", "first_contact_observed", "first_contact_location_complete", "event_locations_complete", "movement_endpoints_complete", "shot_xg_complete")}
-    keys = rows[0].data_quality.keys()
-    return {key: sum(bool(row.data_quality.get(key)) for row in rows) / len(rows) for key in keys}
-
-
-def _review_questions(
-    restart_type: str,
-    rows: list[DeadBallSequence],
-    contacts: Counter[str],
-    players: Counter[str],
-) -> tuple[str, ...]:
-    if not rows:
-        return ()
-    evidence = ", ".join(row.evidence_id for row in rows[:3])
-    questions = [
-        f"Does the repeated {restart_type.replace('_', ' ')} pattern create an assignment question? Supporting evidence: {evidence}.",
-    ]
-    common_zone, common_count = contacts.most_common(1)[0] if contacts else ("not observed", 0)
-    if common_count >= 2 and common_zone != "not observed":
-        questions.append(
-            f"Is the recorded first-contact concentration in {common_zone} visible enough to review? Supporting evidence: {evidence}."
-        )
-    common_player, player_count = players.most_common(1)[0] if players else ("", 0)
-    if player_count >= 2:
-        questions.append(
-            f"Who should review the recurring recorded involvement of {common_player}? Supporting evidence: {evidence}."
-        )
-    return tuple(questions[:3])
+        return {key: 0.0 for key in keys}
+    return {
+        key: sum(row.data_quality.get(key) in {"observed", "not_applicable"} for row in rows)
+        / len(rows)
+        for key in keys
+    }
 
 
 def _timestamp_seconds(timestamp: str) -> float:

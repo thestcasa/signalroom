@@ -1,26 +1,34 @@
 # SignalRoom
 
-SignalRoom converts football event data into short, evidence-linked historical briefings. It is a club-independent applied analytics case study by Alessandro Casadei.
+SignalRoom is a historical set-piece evidence workbench. It helps an analyst inspect recorded attacking dead-ball delivery tendencies, compare declared match windows, review derived evidence summaries, and export a cautious briefing.
 
 **Live demo:** https://signalroom-tka1.onrender.com
 
-The product follows a focused opponent-preparation workflow: choose a historical opponent case, compare the latest team window with the previous team window, and open the event sequences behind any routine difference. It suppresses weak findings instead of filling a report.
+It is an applied analytics case study by Alessandro Casadei. It is not a club-ready opposition-intelligence product, a routine detector, a source of defensive recommendations, or an externally validated workflow.
 
-## What works
+## Implemented scope
 
-- Cache-first StatsBomb Open Data ingestion
-- Provider-neutral match and event models
-- Seven versioned team metrics
-- Non-overlapping baseline and recent windows
-- Match-level bootstrap intervals, permutation tests, effect sizes, sensitivity checks, and false-discovery control
-- Deterministic attacking final-third dead-ball sequences: corners, wide free kicks, indirect near-box free kicks, and direct free-kick shots
-- Delivery, first recorded contact, second phase, player recurrence, shot and xG outcomes where valid
-- Capability registry distinguishing event data from future 360, tracking, and video support
-- Event-level evidence references for every published finding
-- Grounded, template-based reports that need no LLM
-- Interactive Streamlit analyst interface and static HTML exports
-- Configurable routine comparison with bootstrap intervals, sensitivity labels, data-quality gates, and deterministic briefing download
-- Two configurations: Brighton Women in the 2023/24 WSL and Bayer Leverkusen in the 2023/24 Bundesliga
+- Attacking corners
+- Wide final-third free-kick passes
+- Central final-third free-kick passes, with legal direct or indirect status explicitly unavailable
+- Direct free-kick shots, reported without tautological shot-conversion percentages
+- Explicit sequence termination and censoring
+- Recorded roles for taker, intended recipient, first post-delivery actor, and shot actor
+- Match-block uncertainty for recent-versus-preceding corner delivery-group shares
+- Complete FA Women's Super League 2023/24 coverage: 132 fixtures and 12 teams
+- Leave-Brighton-out descriptive peer context
+- Bayer Leverkusen historical case with league peer comparison suppressed because the release is not a complete Bundesliga population
+- Rights-safe public artifacts containing aggregates and derived evidence summaries, not raw records or source event IDs
+
+The application uses one analysis context across the shortlist, evidence review, and HTML export. Every displayed evidence reference resolves to an included derived summary.
+
+## Data and rights
+
+The source is [StatsBomb Open Data](https://github.com/hudl/open-data), pinned to revision `4b73468fc5b0f1950f9f66fada70ad3a4f9327cb`.
+
+The source agreement permits public analysis with attribution but prohibits redistributing or reproducing the underlying data. SignalRoom therefore blocks raw records, source event IDs, exact source excerpts, and exact source-coordinate timelines from public bundles. Public artifacts contain attributed aggregates and SignalRoom-derived summaries. Commercial use remains blocked without written permission.
+
+The repository MIT licence applies only to original SignalRoom code. It does not relicense provider data or branding.
 
 ## Quick start
 
@@ -31,58 +39,38 @@ make build-cases
 make demo
 ```
 
-Open the local URL printed by Streamlit. Raw event files are downloaded from the official source into `data/cache/` and are not committed.
+Raw source files are downloaded into ignored cache paths. Generated case bundles, coverage reports, evidence-integrity reports, and manual-review samples are stored under `artifacts/cases/`.
 
-## Deployment
-
-`render.yaml` is the canonical specification for a single free-plan Render web service with no secrets or external infrastructure. It binds Streamlit to Render's `PORT` and uses `/_stcore/health` for health checks. Existing services created outside a Blueprint must be checked separately for configuration drift. Applying the Blueprint requires selecting the intended Render workspace first:
-
-`https://dashboard.render.com/blueprint/new?repo=https://github.com/thestcasa/signalroom`
-
-Free services can spin down after inactivity and cold-start on the next request. The verified local path remains `make demo`.
-
-To analyze another available team, copy a TOML file in `configs/`, change the team, competition, and season identifiers, then run:
+## Verification
 
 ```bash
-.venv/bin/python -m signalroom.cli build --config configs/your_case.toml
+make lint
+make test
+make build-cases
 ```
+
+The milestone regression report is in `audit/MILESTONE_REGRESSION.md`. It maps F01 to F24 to implementation and verification evidence.
 
 ## Repository map
 
-- `src/signalroom/adapters/`: source-specific ingestion
-- `src/signalroom/models.py`: internal data contract
-- `src/signalroom/metrics.py`: metric definitions and calculations
-- `src/signalroom/statistics.py`: change detection and suppression
-- `src/signalroom/setpieces.py`: corner sequence and routine analysis
-- `src/signalroom/deadballs.py`: provider-neutral final-third dead-ball taxonomy and sequence contract
-- `src/signalroom/capabilities.py`: data capability registry and publication language
-- `src/signalroom/ml.py`: interpretable profile features and conservative ML publication gate
-- `src/signalroom/opponent.py`: comparison baseline, uncertainty, completeness, and stability logic
-- `src/signalroom/evidence.py`: event trace construction
-- `src/signalroom/reporting.py`: deterministic narrative and grounding checks
-- `app.py`: analyst interface
-- `artifacts/cases/`: reproducible derived case outputs, no raw event dataset
-- `docs/`: product, data, analytics, evaluation, architecture, and decision records
-- `outreach/`: stakeholder-ready material
+- `src/signalroom/adapters/`: pinned provider ingestion, lineups, and source-field preservation
+- `src/signalroom/coordinates.py`: selected-team coordinate frame
+- `src/signalroom/deadballs.py`: restart and bounded sequence contract
+- `src/signalroom/setpieces.py`: recorded corner delivery groups
+- `src/signalroom/opponent.py`: match-block comparison and review gates
+- `src/signalroom/peer.py`: complete-population descriptive peer baseline
+- `src/signalroom/evidence.py`: internal reference validation and public derived evidence
+- `src/signalroom/rights.py`: machine-readable publication gates
+- `src/signalroom/pipeline.py`: deterministic case builds and quality reports
+- `app.py`: historical review interface
+- `manifests/`: source and rights declarations
+- `docs/`: current analytical, product, and validation contracts
+- `audit/`: regression status, residual risks, and readiness decision
 
-## Honest positioning
+## Deployment
 
-SignalRoom supports teams and competitions available through its implemented event-data adapters. The initial version uses StatsBomb Open Data and is designed so additional providers can be added later.
+`render.yaml` defines one free-plan Streamlit web service with no secrets or external infrastructure. The health endpoint is `/_stcore/health`. Free services may cold-start after inactivity.
 
-This repository is not affiliated with or endorsed by Brighton & Hove Albion, Bayer Leverkusen, StatsBomb, Hudl, or any other club or data provider. The case studies are historical and are not current tactical advice.
+## Honest limitations
 
-## Opponent-preparation workflow
-
-The default comparison is the selected team's latest chronological match window against its previous chronological window. This is a valid within-team baseline using the source data already bundled in each case. The current bundles do not include every competition match, so SignalRoom does not fabricate a competition-wide routine baseline. A future source expansion can add that baseline after verifying coverage for all teams and matches.
-
-The interface publishes a routine only when the recent sample, routine-share completeness, and comparison evidence gates pass. Bootstrap intervals show uncertainty around share differences. Nearby-window sensitivity produces stakeholder labels such as `stable`, `directionally consistent`, `sensitive to window selection`, or `sample too small`.
-
-The Evidence room filters by restart or routine, opponent, and shot outcome, shows the ordered event sequence and pitch view, and exports source event identifiers. The briefing download is deterministic HTML, not an automated tactical essay.
-
-The default case answers: “What does this opponent repeatedly record from attacking final-third dead balls, what is changing, and which sequences deserve review?” It does not publish a competition baseline when complete comparable team coverage is not loaded. The exploratory team profile is suppressed until a reproducible peer matrix and stability check are available.
-
-## Data terms and attribution
-
-The source data is [StatsBomb Open Data](https://github.com/hudl/open-data). Its README requires StatsBomb attribution and use of its logo when publishing analysis. The data remains subject to the [StatsBomb Public Data User Agreement](https://github.com/hudl/open-data/blob/master/LICENSE.pdf). SignalRoom does not redistribute the raw dataset.
-
-The repository's MIT license applies to SignalRoom's original source code only. It does not relicense StatsBomb data or branding.
+Event data does not provide continuous off-ball movement, screens, marking assignments, tactical intent, or synchronized video. Historical open data is not current preparation data. The public workflow has not been tested by independent professional analysts, so no external validation or adoption is claimed.
