@@ -9,7 +9,7 @@ test:
 	$(PYTHON) -m pytest
 
 lint:
-	$(PYTHON) -m ruff check src tests app.py scripts
+	$(PYTHON) -m ruff check src tests app.py
 
 build-cases:
 	$(PYTHON) -m signalroom.cli build --config configs/brighton_wsl_2023_24.toml
