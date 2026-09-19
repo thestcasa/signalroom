@@ -1,6 +1,6 @@
 # SignalRoom adversarial audit
 
-Audit date: 18 September 2026
+Audit date: 19 September 2026
 
 ## Verdict
 
@@ -16,7 +16,7 @@ The audit verified 22 Brighton matches, 81,809 events, and 92 attacking corners,
 - Recomputed all seven match metrics directly from the pinned raw StatsBomb JSON for all 56 matches without calling SignalRoom metric functions.
 - Recounted matches, events, event IDs, attacking corners, shot-producing sequences, and rebound shots from source records.
 - Rebuilt all 16 case artifacts twice and compared SHA-256 hashes.
-- Exercised both live cases and all four application tabs, inspected browser semantics and console output, and reviewed the Render deploy, logs, configuration, and metrics.
+- Exercised both live cases and all five application tabs, inspected browser semantics and console output, and reviewed the Render deploy, logs, configuration, and metrics.
 - Audited the resolved development environment with `pip-audit`.
 - Rendered and visually inspected the revised one-page stakeholder PDF.
 
@@ -25,8 +25,8 @@ The audit verified 22 Brighton matches, 81,809 events, and 92 attacking corners,
 | Check | Result |
 | --- | --- |
 | Lint | Pass |
-| Tests | 23 passed |
-| Coverage | 89% total, up from 64% |
+| Tests | 29 passed |
+| Coverage | 90% total |
 | Real-data case builds | Pass for Brighton and Leverkusen |
 | Repeated artifact build | Byte-identical across 16 files |
 | Independent metric recomputation | 0 mismatches across 392 values |
@@ -34,7 +34,7 @@ The audit verified 22 Brighton matches, 81,809 events, and 92 attacking corners,
 | Evidence and narrative grounding | Pass for both bundles |
 | Optional dependency audit | No known vulnerabilities after upgrades |
 | PDF | One A4 page, visually verified, text extraction verified |
-| Final live deployment | Commit `f98c1b9`, deploy `dep-damk0r8u01pc73910sog`, CI passed, no Render error logs |
+| Final live deployment | Commit `7a3721fa`, deploy `dep-damt2f97lnhs73dmfh40`, live and browser-verified |
 | LLM-free operation | Verified, no key or external model dependency exists |
 
 ## Most important findings and repairs
@@ -43,7 +43,7 @@ The audit verified 22 Brighton matches, 81,809 events, and 92 attacking corners,
 2. Long deliveries ending before x=108 were silently labeled short, including deliveries close to 40 pitch units. Short corners are now defined only by first-delivery length at or below 15 units; missing length becomes `unknown`.
 3. A constant baseline and a different constant recent window produced infinite Hedges g, which could both overstate evidence and create non-standard JSON. Undefined effects now serialize as `null` and are suppressed explicitly.
 4. The committed generated timestamp made identical analytical builds differ. Runtime timestamps were removed from analytical bundles and reports; the pinned source revision is shown instead.
-5. The original 15-test suite left ingestion, the complete pipeline, charts, CLI, and cache failure modes effectively untested. The repaired suite has 23 tests, 89% coverage, a deterministic end-to-end pipeline fixture, cache recovery coverage, and CI.
+5. The original 15-test suite left ingestion, the complete pipeline, charts, CLI, and cache failure modes effectively untested. The repaired suite has 29 tests, 90% coverage, a deterministic end-to-end pipeline fixture, cache recovery coverage, and CI.
 6. Small coral and teal text failed WCAG AA contrast against the paper background, chart images had meaningless `alt="0"`, and the visual hero was not an `h1`. Colors, image rendering, alternative text, and heading semantics were repaired.
 7. The window-comparison chart placed xG and count metrics on a shared raw scale. It now uses comparable Hedges g values and annotates each row with the original baseline and recent values.
 8. Corrupt cached JSON failed immediately. Cache entries are now reacquired and written atomically.
@@ -52,7 +52,7 @@ The audit verified 22 Brighton matches, 81,809 events, and 92 attacking corners,
 
 The machine-readable register in `audit/findings.json` contains reproduction and verification detail for every finding.
 
-Browser evidence is retained in `audit/screenshots/live-before.jpg` and `audit/screenshots/live-after.jpg`. The final deployment was exercised across both historical cases and all four application tabs.
+Browser evidence is retained in `audit/screenshots/live-before.jpg` and `audit/screenshots/live-after.jpg`. The final deployment was exercised across both historical cases and all five application tabs. The final release also corrected an artifact publication-path defect that had caused a UTF-8 decode error in the first deployed extension revision.
 
 ## Analytical validity
 

@@ -208,7 +208,7 @@
       "impact": "Analysts previously lacked an opponent-preparation comparison context.",
       "resolution": "Added the opponent comparison layer, quality gates, stability labels, filtered evidence room, and deterministic briefing export.",
       "repaired": true,
-      "verification": "27 tests pass, both real bundles rebuild, strict JSON parsing passes, and independent routine share recomputation matches the comparison layer."
+      "verification": "29 tests pass, both real bundles rebuild, strict JSON parsing passes, and independent routine share recomputation matches the comparison layer."
     },
     {
       "id": "SR-P-001",

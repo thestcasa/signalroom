@@ -47,3 +47,4 @@
 - Added an interpretable team profile feature vector with a conservative ML gate; current cases suppress clustering because no complete peer matrix is loaded.
 - Added a dedicated Dead-ball Lab, capability warnings, broader evidence filters, data-source research, and schema `1.2.0` compatibility handling.
 - Independently recomputed category counts and verified strict JSON, evidence resolution, deterministic builds, 29 tests, and 90% total coverage.
+- Published only bounded representative sequences in deployed bundles while retaining full-event denominators for analytical counts; corrected the GitHub tree paths used by the Render runtime and verified the live application across both cases and all five tabs.
